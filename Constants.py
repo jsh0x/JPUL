@@ -600,10 +600,10 @@ CHARACTER_ARRAYS = {'a': np.array((('c48641','404040','404040','404040','86c4ff'
 																	('ffffff','ffffff','e2a664','64a6e2','ffffff','ffffff'),
 																	('ffffff','ffffff','ffffff','ffffff','ffffff','ffffff'),
 																	('ffffff','ffffff','ffffff','ffffff','ffffff','ffffff')), dtype=str),
-                    '[': np.array((), dtype=str),
-                    ']': np.array((), dtype=str),
-                    ';': np.array((), dtype=str),
-                    "'": np.array((), dtype=str),
+                    '[': np.array((), dtype=str), '{': np.array((), dtype=str),
+                    ']': np.array((), dtype=str), '}': np.array((), dtype=str),
+                    ';': np.array((), dtype=str), ':': np.array((), dtype=str),
+                    "'": np.array((), dtype=str), '"': np.array((), dtype=str),
                     ',': np.array((('ffffff','ffffff','ffffff'),
 								   ('ffffff','ffffff','ffffff'),
 								   ('ffffff','ffffff','ffffff'),
@@ -652,9 +652,4 @@ CHARACTER_ARRAYS = {'a': np.array((('c48641','404040','404040','404040','86c4ff'
 																	('ffffff','ffffff','ffc486','4164a6','e2ffff','ffffff'),
 																	('ffffff','ffffff','e2a664','64a6e2','ffffff','ffffff'),
 																	('ffffff','ffffff','ffffff','ffffff','ffffff','ffffff'),
-																	('ffffff','ffffff','e2a664','64a6e2','ffffff','ffffff')), dtype=str),
-
-                    '{': np.array((), dtype=str),
-                    '}': np.array((), dtype=str),
-                    ':': np.array((), dtype=str),
-                    '"': np.array((), dtype=str)}
+																	('ffffff','ffffff','e2a664','64a6e2','ffffff','ffffff')), dtype=str)}
