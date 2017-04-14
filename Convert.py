@@ -6,13 +6,13 @@ import numpy as np
 
 
 def hex2rgb(color):
-	if type(color) is str and len(color) == 6: return np.array((np.int(color[:2], base=16), np.int(color[2:4], base=16), np.int(color[4:], base=16)), dtype=np.int)
-	elif type(color) is not str: raise TypeError(f"Value 'color' incompatible type: {type(color)}")
+	if (type(color) is str or type(color) is np.str_) and len(color) == 6: return np.array((np.int(color[:2], base=16), np.int(color[2:4], base=16), np.int(color[4:], base=16)), dtype=np.int)
+	elif type(color) is not str and type(color) is not np.str_: raise TypeError(f"Value 'color' incompatible type: {type(color)}")
 	else: raise ValueError(f"Value 'color' incompatible hex-string length: {len(color)}")
 
 def hex2rgba(color):
-	if type(color) is str and len(color) == 8: return np.array((np.int(color[:2], base=16), np.int(color[2:4], base=16), np.int(color[4:6], base=16), np.int(color[6:], base=16)), dtype=np.int)
-	elif type(color) is not str: raise TypeError(f"Value 'color' incompatible type: {type(color)}")
+	if (type(color) is str or type(color) is np.str_) and len(color) == 8: return np.array((np.int(color[:2], base=16), np.int(color[2:4], base=16), np.int(color[4:6], base=16), np.int(color[6:], base=16)), dtype=np.int)
+	elif type(color) is not str and type(color) is not np.str_: raise TypeError(f"Value 'color' incompatible type: {type(color)}")
 	else: raise ValueError(f"Value 'color' incompatible hex-string length: {len(color)}")
 
 def rgb2hex(color):
@@ -23,7 +23,7 @@ def rgb2hex(color):
 		elif color[1] > 255 or color[1] < 0: raise ValueError(f"Green value in 'color' out of range 0 - 255: {color[1]}")
 		if type(color[2]) is not int and type(color[2]) is not float: TypeError(f"Blue value in 'color' incompatible type: {type(color[2])}")
 		elif color[2] > 255 or color[2] < 0: raise ValueError(f"Blue value in 'color' out of range 0 - 255: {color[2]}")
-		return hex(color[0]).format('x')[1]+hex(color[1]).format('x')[1]+hex(color[2]).format('x')[1]
+		return hex(color[0]).split('x')[1]+hex(color[1]).split('x')[1]+hex(color[2]).split('x')[1]
 	elif type(color) is not tuple and type(color) is not list and type(color) is not np.ndarray: raise TypeError(f"Value 'color' incompatible type: {type(color)}")
 	else: raise ValueError(f"Value 'color' incompatible {type(color)} length: {len(color)}")
 
@@ -37,6 +37,11 @@ def rgba2hex(color):
 		elif color[2] > 255 or color[2] < 0: raise ValueError(f"Blue value in 'color' out of range 0 - 255: {color[2]}")
 		if type(color[3]) is not int and type(color[3]) is not float: TypeError(f"Alpha value in 'color' incompatible type: {type(color[3])}")
 		elif color[3] > 255 or color[3] < 0: raise ValueError(f"Alpha value in 'color' out of range 0 - 255: {color[3]}")
-		return hex(color[0]).format('x')[1]+hex(color[1]).format('x')[1]+hex(color[2]).format('x')[1]+hex(color[3]).format('x')[1]
+		return hex(color[0]).split('x')[1]+hex(color[1]).split('x')[1]+hex(color[2]).split('x')[1]+hex(color[3]).split('x')[1]
 	elif type(color) is not tuple and type(color) is not list and type(color) is not np.ndarray: raise TypeError(f"Value 'color' incompatible type: {type(color)}")
 	else: raise ValueError(f"Value 'color' incompatible {type(color)} length: {len(color)}")
+
+def index2coord(i, width, height, depth=None):
+	if depth is not None: i = np.add(np.floor_divide(i, depth), 1)
+	if i < width: return (i, 0)
+	elif i >= width: return(np.fmod(i, width), np.floor_divide(i, width))
