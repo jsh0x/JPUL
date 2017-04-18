@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw
 from Convert import hex2rgb, index2coord, rgb2hex
 from Constants import CHARACTER_ARRAYS
 
-master_img = None
+
 
 def space_conflict(roi1, roi2):
 	roi1 = [(x,y) for y in np.arange(roi1[1],roi1[3]) for x in np.arange(roi1[0],roi1[2])]
@@ -60,9 +60,8 @@ def get_gradient(image):
 		ret_img[y,x] = np.array([r,g,b], dtype=np.uint8)
 	return ret_img.mean(axis=2)
 
-
-
-def OCR(input_string, haystack_image, tolerance_threshold=10):
+def OCR(input_string, haystack_image, tolerance_threshold=10, roi=None):
+	#HIGHLY recommend tolerance thresholds < 20
 	if type(input_string) is not str: raise TypeError(f"Value 'input_string' must be type str, instead got type {type(input_string)}")
 	if len(input_string) == 0: raise ValueError("Value 'input_string' is empty")
 	if type(haystack_image) is str and not os.path.exists(haystack_image): raise FileNotFoundError(f"Image directory '{haystack_image}' not found")
@@ -73,148 +72,73 @@ def OCR(input_string, haystack_image, tolerance_threshold=10):
 	retval_dict = {}
 	im = Image.fromarray(np.asarray(img, dtype=np.uint8))
 	draw = ImageDraw.Draw(im)
-	for char in input_string:
+	if roi is None:
+		char = input_string[0]
 		img2 = np.copy(img)
-		color = (rand(256), rand(256), rand(256))
-		if len(retval_dict.keys()) > 0:
-			for val in retval_dict.values():
-				for x1,y1,x2,y2 in val:
-					char_array = CHARACTER_ARRAYS[char]
-					#cy,cx = y1+(y2/2), x1+(x2/2)
-					img2 = np.copy(img[y1-(int(char_array.shape[0]/2)):y2+(int(char_array.shape[0]/2)), x1:x2+(char_array.shape[1]*2)])
-		retval_dict[char] = []
 		char_array = CHARACTER_ARRAYS[char]
 		char_array2 = np.zeros((char_array.shape[0], char_array.shape[1], 3))
 		for y in np.arange(char_array.shape[0]):
 			for x in np.arange(char_array.shape[1]):
 				char_array2[y,x]=hex2rgb(char_array[y,x])
-		char_array3 = char_array2.mean(axis=2)-char_array2.mean(axis=2).min()
-		global master_img
-		char_array3 = master_img
+		char_array3 = char_array2.mean(axis=2)
 		for y in np.arange(img2.shape[0]-char_array3.shape[0]):
 			for x in np.arange(img2.shape[1]-char_array3.shape[1]):
 				krn = (img2[y:y+char_array3.shape[0],x:x+char_array3.shape[1]]).mean(axis=2)
-				krn-=krn.min()
 				if np.abs(np.subtract(krn, char_array3)).mean() < tolerance_threshold:
-					draw.rectangle((x, y, x + char_array.shape[1], y + char_array.shape[0]), outline=(255, 0, 0))
-	im.show()
-	"""maxx = 0
-	maxy = 0
-	minx = 1000000
-	miny = 1000000
-	print(list(retval_dict.values()))
-	for val in retval_dict.values():
-		for x1, y1, x2, y2 in val:
-			minx = min(x1, minx)
-			miny = min(y1, miny)
-			maxx = max(x2, maxx)
-			maxy = max(y2, maxy)
-	draw.rectangle((minx, miny, maxx, maxy), outline=color)
-	im.show()"""
-	"""for i,row in enumerate(img[:]):  # splits image into rows
-			row2 = np.copy(row)
-			for j in np.arange(0, row2.shape[0]-char_array3.shape[0]):  # iterates through a section of the row equal to the width of the char
-				sl = row2[j:j+char_array3.shape[0]-1]-row2[j:j+char_array3.shape[0]-1].min()  # equalizes minimum
-				#print(sl.tolist())
-				#print(char_array3[0]-char_array3[0].min().tolist())
-				#print()
-				if np.abs(np.subtract(sl, char_array3[0])) < tolerance_threshold:
-					print(np.abs(np.subtract(sl, char_array3[0])))
-					print(i,j)"""
-	#if np.sum((np.abs(row2-rgb)), axis=1).min() < tolerance_threshold:
-		#	j = np.sum((np.abs(img[i, :]-rgb)), axis=1).tolist().index(np.sum(np.abs(img[i, :]-rgb), axis=1).min())  # finds the index of the value row-wise
-		#	val_list.append([i,j])
+					if roi is None: roi = [(x, y, x + char_array.shape[1], y + char_array.shape[0])]
+					else: roi.append((x, y, x + char_array.shape[1], y + char_array.shape[0]))
+		else:
 
-	"""for py,px in val_list:
-			#break_out = False
-			if np.average(np.subtract(img[py:py+char_array.shape[0], px-np.floor_divide(char_array.shape[1],2):px-np.floor_divide(char_array.shape[1],2)+char_array.shape[1]],char_array2)) >= tolerance_threshold:
-				val_list.remove([py, px])
-				break
-		im = Image.fromarray(np.asarray(img, dtype=np.uint8))
-		draw = ImageDraw.Draw(im)
-		rm_list = []
-		for y,x in val_list:
-			for y2, x2 in val_list:
-				if space_conflict((x-np.floor_divide(char_array.shape[1],2),y,(x-np.floor_divide(char_array.shape[1],2))+char_array.shape[1],y+char_array.shape[0]),
-					              (x2-np.floor_divide(char_array.shape[1],2),y2,(x2-np.floor_divide(char_array.shape[1],2))+char_array.shape[1],y2+char_array.shape[0])) and x != x2 and y != y2:
-					rm_list.append(((y,x),(y2,x2)))
-		for yx1,yx2 in rm_list:
-			y1,x1 = yx1
-			y2,x2 = yx2
-			try:
-				val1 = np.average(np.subtract(img[y1:y1+char_array.shape[0], x1-np.floor_divide(char_array.shape[1],2):(x1-np.floor_divide(char_array.shape[1],2))+char_array.shape[1]], char_array2))
-				val2 = np.average(np.subtract(img[y2:y2+char_array.shape[0], x2-np.floor_divide(char_array.shape[1],2):(x2-np.floor_divide(char_array.shape[1],2))+char_array.shape[1]], char_array2))
-			except:pass
+			old = tolerance_threshold
+			for char in input_string[1:]:
+				#if char == ('l' or 'I'):
+				#	tolerance_threshold = 10
+				#else: tolerance_threshold = old
+				for i in range(len(roi)):
+					x1, y1, x2, y2 = roi.pop(0)
+					#color = (rand(256), rand(256), rand(256))
+					#color2 = (rand(256), rand(256), rand(256))
+					#size=2
+					char_array = CHARACTER_ARRAYS[char]
+					y3 = np.add(np.floor_divide((y2-y1),2), y1)
+					y4 = y3 + char_array.shape[0]
+					y3 = y3 - char_array.shape[0]
+					x4 = np.add(np.add(x2,char_array.shape[1]), np.floor_divide(char_array.shape[1], 2))
+					img2 = np.copy(img[min(y1,y3):max(y2,y4), x1:x4])
+					print(min(y1,y3),max(y2,y4), x1,x4)
+					#draw.ellipse((x1 - size, y1 - size, x1 + size, y1 + size), fill=color)
+					#draw.ellipse((x2 - size, y2 - size, x2 + size, y2 + size), fill=color)
+					#draw.ellipse((x1 - size, min(y1, y3) - size, x1 + size, min(y1, y3) + size), fill=color2)
+					#draw.ellipse((x3 - size, max(y2, y4) - size, x3 + size, max(y2, y4) + size), fill=color2)
+					char_array2 = np.zeros((char_array.shape[0], char_array.shape[1], 3))
+					for y in np.arange(char_array.shape[0]):
+						for x in np.arange(char_array.shape[1]):
+							char_array2[y, x] = hex2rgb(char_array[y, x])
+					char_array3 = char_array2.mean(axis=2)
+					for y in np.arange(img2.shape[0] - char_array3.shape[0]):
+						for x in np.arange(img2.shape[1] - char_array3.shape[1]):
+							krn = (img2[y:y + char_array3.shape[0], x:x + char_array3.shape[1]]).mean(axis=2)
+							if np.abs(np.subtract(krn, char_array3)).mean() < tolerance_threshold:
+								print(char, x, y, np.abs(np.subtract(krn, char_array3)).mean())
+								roi.append((min(x+x1, x1), min(y+y1, y1), max(x + char_array.shape[1] + x1, x2), min(y + char_array.shape[0] + y1, y2)))
 			else:
-				if val1 > val2:
-					try: val_list.remove(yx1)
-					except: pass
-				elif val2 > val1:
-					try: val_list.remove(yx2)
-					except: pass
-				else:
-					try:
-						val_list.remove(yx1)
-						val_list.remove(yx2)
-					except: pass
-		for y,x in val_list:
-			draw.rectangle((x,y,x+char_array.shape[1],y+char_array.shape[0]),outline=(255,0,0))
-		im.show()
-		return
-		#252,241
-		#quit()"""
-	"""temp_array = np.zeros((char_array.shape[0],char_array.shape[1],3))
-		for y in np.arange(char_array.shape[0]):
-			for x in np.arange(char_array.shape[1]):
-				r,g,b = hex2rgb(char_array[y,x])
-				temp_array[y,x,0] = r
-				temp_array[y,x,1] = g
-				temp_array[y,x,2] = b
-		char_array = temp_array
-		y1 = np.arange(0, img.shape[0]-char_array.shape[0])
-		x1 = np.arange(0, img.shape[1]-char_array.shape[1])
-		for y in y1:
-			for x in x1:
-				#if np.allclose(img[y:y + char_array.shape[0], x:x + char_array.shape[1], :], char_array):
-				#	print(f"{char}@ ({x}, {y}, {x+char_array.shape[1]}, {y+char_array.shape[0]})")
-					#print(char+"", x, x + char_array.shape[1], y, y + char_array.shape[0])
-				#print(x,x+char_array.shape[1],y,y+char_array.shape[0],np.average(np.abs(np.subtract(img[y:y+char_array.shape[0], x:x+char_array.shape[1], :], char_array))))
-				if np.average(np.abs(np.subtract(img[y:y+char_array.shape[0], x:x+char_array.shape[1], :], char_array))) < tolerance_thresh:
-					retval_dict[char].append((x,y,x+char_array.shape[1],y+char_array.shape[0]))
-					#print(f"{char}: ({x}, {y}, {x+char_array.shape[1]}, {y+char_array.shape[0]}) = {np.average(np.abs(np.subtract(img[y:y+char_array.shape[0], x:x+char_array.shape[1], :], char_array)))}")
-	for k in retval_dict.keys():
-		for k2 in retval_dict.keys():
-			try:rm_dict = [(max((np.average(np.abs(np.subtract(img[c1[1]:c1[3], c1[0]:c1[2], :], char_array))), c1, k),(np.average(np.abs(np.subtract(img[c2[1]:c2[3], c2[0]:c2[2], :], char_array))), c2, k2))) for c1 in retval_dict[k] for c2 in retval_dict[k2] if space_conflict(c1, c2)]
-			except: pass
-	print(rm_dict)"""
-
-#OCR('MDN', 'Q:/autopaper/Untitled.png')
-#im_array = get_gradient('Q:/autopaper/Untitled.png')
-#im = Image.fromarray(np.asarray(im_array, dtype=np.uint8))
+				print(len(roi))
+				target = 0
+				count = 0
+				for char in input_string:
+					char_array = CHARACTER_ARRAYS[char]
+					target += char_array.shape[1]
+				for x1, y1, x2, y2 in roi:
+					if target - (x2-x1) < 4:
+						count += 1
+						print(target, x2-x1, y2-y1)
+						color = (255, 0, 0)
+						draw.rectangle((x1, y1, x2, y2), outline=color)
+	print(count)
+	im.save('test14.jpg')
+	im.show()
 
 
-char_array = CHARACTER_ARRAYS['S']
-maxh = max(CHARACTER_ARRAYS['S'].shape[1], CHARACTER_ARRAYS['R'].shape[1], CHARACTER_ARRAYS['O'].shape[1])
-print(maxh)
-s = np.zeros((char_array.shape[0], maxh, 3))
-for y in np.arange(char_array.shape[0]):
-	for x in np.arange(char_array.shape[1]):
-		s[y,x]=hex2rgb(char_array[y,x])
 
-char_array = CHARACTER_ARRAYS['R']
-r = np.zeros((char_array.shape[0], maxh, 3))
-for y in np.arange(char_array.shape[0]):
-	for x in np.arange(char_array.shape[1]):
-		r[y,x]=hex2rgb(char_array[y,x])
-
-char_array = CHARACTER_ARRAYS['O']
-o = np.zeros((char_array.shape[0], maxh, 3))
-for y in np.arange(char_array.shape[0]):
-	for x in np.arange(char_array.shape[1]):
-		o[y,x]=hex2rgb(char_array[y,x])
-c = np.hstack((s,r,o))
-print(s.shape, r.shape, o.shape)
-
-dst = get_gradient(c)
-master_img = dst
-OCR('S', 'Q:/autopaper/Untitled4.png', 20)
+#OCR('SRO', 'Q:/autopaper/Untitled4.png', tolerance_threshold=12)
+OCR('n', 'Q:/autopaper/Untitled4.png', tolerance_threshold=14)

@@ -746,4 +746,4 @@ def get():
 			temp_list.append(rgb)
 		retval+= string.format(*temp_list)
 	print(retval)
-get()
+#get()
