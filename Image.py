@@ -8,6 +8,8 @@ import numpy as np
 from PIL import Image, ImageDraw
 from Convert import hex2rgb, index2coord, rgb2hex
 from Constants import CHARACTER_ARRAYS
+from Zmath import total_differential as t_diff
+import datetime
 
 
 
@@ -24,7 +26,8 @@ def get_gradient(image):
 	elif type(image) is Image.Image: img = np.array(image, dtype=np.int16)
 	elif type(image) is np.ndarray: img = image
 	else: raise TypeError(f"Value 'image' must be a PIL Image-Object, an image directory, or an image array, instead got {type(image)}")
-	ret_img = np.zeros((img.shape[0]-1, img.shape[1]-1, 3))
+	ret_img = t_diff(img)
+	"""ret_img = np.zeros((img.shape[0]-1, img.shape[1]-1, 3))
 	ret_dict = {}
 	for y in np.arange(ret_img.shape[0]):
 		for x in np.arange(ret_img.shape[1]):
@@ -58,7 +61,8 @@ def get_gradient(image):
 		g /= len(v)
 		b /= len(v)
 		ret_img[y,x] = np.array([r,g,b], dtype=np.uint8)
-	return ret_img.mean(axis=2)
+	return ret_img.mean(axis=2)"""
+	return ret_img
 
 def OCR(input_string, haystack_image, tolerance_threshold=10, roi=None):
 	#HIGHLY recommend tolerance thresholds < 20
@@ -83,17 +87,17 @@ def OCR(input_string, haystack_image, tolerance_threshold=10, roi=None):
 		char_array3 = char_array2.mean(axis=2)
 		for y in np.arange(img2.shape[0]-char_array3.shape[0]):
 			for x in np.arange(img2.shape[1]-char_array3.shape[1]):
-				krn = (img2[y:y+char_array3.shape[0],x:x+char_array3.shape[1]]).mean(axis=2)
+				try: krn = (img2[y:y+char_array3.shape[0],x:x+char_array3.shape[1]]).mean(axis=2)
+				except IndexError: krn = (img2[y:y+char_array3.shape[0],x:x+char_array3.shape[1]])
 				if np.abs(np.subtract(krn, char_array3)).mean() < tolerance_threshold:
 					if roi is None: roi = [(x, y, x + char_array.shape[1], y + char_array.shape[0])]
 					else: roi.append((x, y, x + char_array.shape[1], y + char_array.shape[0]))
 		else:
-
 			old = tolerance_threshold
 			for char in input_string[1:]:
-				#if char == ('l' or 'I'):
-				#	tolerance_threshold = 10
-				#else: tolerance_threshold = old
+				if char == ('l' or 'I'):
+					tolerance_threshold = 10
+				else: tolerance_threshold = old
 				for i in range(len(roi)):
 					x1, y1, x2, y2 = roi.pop(0)
 					#color = (rand(256), rand(256), rand(256))
@@ -117,7 +121,8 @@ def OCR(input_string, haystack_image, tolerance_threshold=10, roi=None):
 					char_array3 = char_array2.mean(axis=2)
 					for y in np.arange(img2.shape[0] - char_array3.shape[0]):
 						for x in np.arange(img2.shape[1] - char_array3.shape[1]):
-							krn = (img2[y:y + char_array3.shape[0], x:x + char_array3.shape[1]]).mean(axis=2)
+							try: krn = (img2[y:y + char_array3.shape[0], x:x + char_array3.shape[1]]).mean(axis=2)
+							except IndexError: krn = (img2[y:y + char_array3.shape[0], x:x + char_array3.shape[1]])
 							if np.abs(np.subtract(krn, char_array3)).mean() < tolerance_threshold:
 								print(char, x, y, np.abs(np.subtract(krn, char_array3)).mean())
 								roi.append((min(x+x1, x1), min(y+y1, y1), max(x + char_array.shape[1] + x1, x2), min(y + char_array.shape[0] + y1, y2)))
@@ -129,16 +134,25 @@ def OCR(input_string, haystack_image, tolerance_threshold=10, roi=None):
 					char_array = CHARACTER_ARRAYS[char]
 					target += char_array.shape[1]
 				for x1, y1, x2, y2 in roi:
-					if target - (x2-x1) < 4:
+					if target - (x2-x1) < 10:
 						count += 1
 						print(target, x2-x1, y2-y1)
 						color = (255, 0, 0)
 						draw.rectangle((x1, y1, x2, y2), outline=color)
 	print(count)
-	im.save('test14.jpg')
 	im.show()
 
 
 
 #OCR('SRO', 'Q:/autopaper/Untitled4.png', tolerance_threshold=12)
-OCR('n', 'Q:/autopaper/Untitled4.png', tolerance_threshold=14)
+#OCR('Unit', get_gradient('Q:/autopaper/Untitled.jpg'), tolerance_threshold=24)
+now=datetime.datetime.today()
+im2 = np.array(Image.open('Q:/autopaper/Untitled2.png').convert('L'))
+#print(im2.shape)
+im = Image.fromarray(get_gradient(im2))
+#print(datetime.datetime.today()-now)
+#im.show()
+im.save('Untitled2.png')
+# TODO: Handle multiple words separated by spaces
+# COLOR= 108.622931 seconds
+# GRAY=  39.256156 seconds
