@@ -75,7 +75,7 @@ class radiobuttonGroup:
 	def remove_radiobutton(self, name):
 		if self.radiobuttons is None: raise IndexError("Radiobuttons is empty")
 		n = self.radiobuttons.shape[0]
-		if n == 1 and self.radiobuttons[0] == name:
+		if n == 1 and self.radiobuttons[0].name == name:
 			self.radiobuttons = None
 		else:
 			_temp = np.empty((n-1), dtype=object)
@@ -165,7 +165,7 @@ class tabGroup:
 	def remove_tab(self, name):
 		if self.tabs is None: raise IndexError("Tabs is empty")
 		n = self.tabs.shape[0]
-		if n == 1 and self.tabs[0] == name:
+		if n == 1 and self.tabs[0].name == name:
 			self.tabs = None
 		else:
 			_temp = np.empty((n-1), dtype=object)
@@ -219,12 +219,12 @@ class combobox(form_object):
 		if type(name) is not str: raise TypeError(f"Expected type: {str}, instead got type: {type(name)}")
 		if self.values is None: raise IndexError("Values is empty")
 		n = self.values.shape[0]
-		if n == 1 and self.values[0] == name:
+		if n == 1 and self.values[0].name == name:
 			self.values = None
 			self.selected_index = None
 			self.selected_value = None
 		else:
-			_temp = np.empty((n - 1), dtype=object)
+			_temp = np.empty((n-1), dtype=object)
 			i = 0
 			for val in self.values:
 				if val.name == name:
@@ -248,6 +248,90 @@ class combobox(form_object):
 				self.selected_value = self.values[self.selected_index]
 				break
 		else: raise NameError(f"Value '{name}' does not exist")
+
+class textbox(form_object):
+	def __init__(self, name, coordinates):
+		super().__init__(name, coordinates)
+		self.text = None
+		self.lines = 0
+
+	def add_line(self, text):
+		if type(text) is not str: raise TypeError(f"Expected type: {str}, instead got type: {type(text)}")
+		if self.text is None: self.text = np.empty((1,), dtype=str)
+		else:
+			n = self.text.shape[0]
+			_temp = np.empty((n+1), dtype=str)
+			_temp[:-1] = self.text
+		self.text[self.text.shape[0]-1] = text
+		self.lines = self.text.shape[0]
+
+	def remove_line(self, line_number=None):
+		if self.text is None: raise IndexError("Text is empty")
+		if line_number is None: line_number = self.text.shape[0]
+		if type(line_number) is not int: raise TypeError(f"Expected type: {int}, instead got type: {type(line_number)}")
+		if line_number < 0 or line_number > self.lines: raise IndexError(f"Line {line_number} is out of range.")
+		n = self.text.shape[0]
+		if n == 1:
+			self.text = None
+			self.lines = 0
+		else:
+			_temp = np.empty((n-1), dtype=str)
+			i = 0
+			for row in self.text:
+				i += 1
+				if i == line_number: continue
+				_temp[i-1] = row
+			else:
+				self.text = _temp
+				self.lines = self.text.shape[0]
+
+
+	#def insert_line(self, text, line_number):
+
+class numberbox(form_object):
+	def __init__(self, name, coordinates, data_type=np.float32):
+		super().__init__(name, coordinates)
+		self.value = 0
+		self.data_type = data_type
+		self.value = self.data_type(self.value)
+
+	def add_value(self, value):
+		self.value = self.data_type(np.add(self.value, value))
+
+	def subtract_value(self, value):
+		self.value = self.data_type(np.subtract(self.value, value))
+
+	def multiply_value(self, value):
+		self.value = self.data_type(np.multiply(self.value, value))
+
+	def divide_value(self, value):
+		self.value = self.data_type(np.true_divide(self.value, value))
+
+	def floor_divide_value(self, value):
+		self.value = self.data_type(np.floor_divide(self.value, value))
+
+	def set_value(self, value):
+		self.value = self.data_type(value)
+
+	def increment_value(self):
+		self.value = self.data_type(np.add(self.value, 1))
+
+	def decrement_value(self):
+		self.value = self.data_type(np.subtract(self.value, 1))
+
+class button(form_object):
+	def __init__(self, name, coordinates, text=None):
+		super().__init__(name, coordinates)
+		if text is None: self.text = self.name
+		elif type(text) is str: self.text = text
+		else: raise TypeError(f"Expected type: {str}, instead got type: {type(text)}")
+
+class label(form_object):
+	def __int__(self, name, coordinates, text=None):
+		super().__init__(name, coordinates)
+		if text is None: self.text = self.name
+		elif type(text) is str: self.text = text
+		else: raise TypeError(f"Expected type: {str}, instead got type: {type(text)}")
 
 class Form:
 	def __init__(self, name):
@@ -277,7 +361,7 @@ class Form:
 	def remove_checkbox(self, name):
 		if self.checkboxes is None: raise IndexError("Checkboxes is empty")
 		n = self.checkboxes.shape[0]
-		if n == 1 and self.checkboxes[0] == name:
+		if n == 1 and self.checkboxes[0].name == name:
 			self.checkboxes = None
 		else:
 			_temp = np.empty((n-1), dtype=object)
@@ -307,7 +391,7 @@ class Form:
 	def remove_radiobuttonGroup(self, name):
 		if self.radiobuttonGroups is None: raise IndexError("Radiobutton groups is empty")
 		n = self.radiobuttonGroups.shape[0]
-		if n == 1 and self.radiobuttonGroups[0] == name:
+		if n == 1 and self.radiobuttonGroups[0].name == name:
 			self.radiobuttonGroups = None
 		else:
 			_temp = np.empty((n-1), dtype=object)
@@ -337,7 +421,7 @@ class Form:
 	def remove_grid(self, name):
 		if self.grids is None: raise IndexError("Grids is empty")
 		n = self.grids.shape[0]
-		if n == 1 and self.grids[0] == name:
+		if n == 1 and self.grids[0].name == name:
 			self.grids = None
 		else:
 			_temp = np.empty((n-1), dtype=object)
@@ -367,7 +451,7 @@ class Form:
 	def remove_tabGroup(self, name):
 		if self.tabGroups is None: raise IndexError("Tab groups is empty")
 		n = self.tabGroups.shape[0]
-		if n == 1 and self.tabGroups[0] == name:
+		if n == 1 and self.tabGroups[0].name == name:
 			self.tabGroups = None
 		else:
 			_temp = np.empty((n-1), dtype=object)
@@ -397,7 +481,7 @@ class Form:
 	def remove_combobox(self, name):
 		if self.comboboxes is None: raise IndexError("Comboboxes is empty")
 		n = self.comboboxes.shape[0]
-		if n == 1 and self.comboboxes[0] == name:
+		if n == 1 and self.comboboxes[0].name == name:
 			self.comboboxes = None
 		else:
 			_temp = np.empty((n-1), dtype=object)
@@ -413,3 +497,123 @@ class Form:
 		for val in self.comboboxes:
 			if val.name == name: return val
 		else: raise NameError(f"Combobox with name '{name}' does not exist")
+
+	def add_textbox(self, name, coordinates):
+		if self.textboxes is None: self.textboxes = np.empty((1,), dtype=object)
+		else:
+			for val in self.textboxes:
+				if name.lower() == val.name.lower(): raise NameError(f"Textbox with name '{name}' already exists")
+			n = self.textboxes.shape[0]
+			_temp = np.empty((n+1), dtype=object)
+			_temp[:-1] = self.textboxes
+			self.textboxes = _temp
+		self.textboxes[self.textboxes.shape[0]-1] = textbox(name, coordinates)
+	def remove_textbox(self, name):
+		if self.textboxes is None: raise IndexError("Textboxes is empty")
+		n = self.textboxes.shape[0]
+		if n == 1 and self.textboxes[0].name == name:
+			self.textboxes = None
+		else:
+			_temp = np.empty((n-1), dtype=object)
+			i = 0
+			for val in self.textboxes:
+				if val.name == name: continue
+				elif np.equal(i, n): raise NameError(f"Textbox with name '{name}' does not exist")
+				_temp[i] = val
+				i += 1
+			else: self.textboxes = _temp
+	def get_textbox(self, name):
+		if self.textboxes is None: raise IndexError(f"Textboxes is empty")
+		for val in self.textboxes:
+			if val.name == name: return val
+		else: raise NameError(f"Textbox with name '{name}' does not exist")
+
+	def add_numberbox(self, name, coordinates):
+		if self.numberboxes is None: self.numberboxes = np.empty((1,), dtype=object)
+		else:
+			for val in self.numberboxes:
+				if name.lower() == val.name.lower(): raise NameError(f"Numberbox with name '{name}' already exists")
+			n = self.numberboxes.shape[0]
+			_temp = np.empty((n+1), dtype=object)
+			_temp[:-1] = self.numberboxes
+			self.numberboxes = _temp
+		self.numberboxes[self.numberboxes.shape[0]-1] = numberbox(name, coordinates)
+	def remove_numberbox(self, name):
+		if self.numberboxes is None: raise IndexError("Numberboxes is empty")
+		n = self.numberboxes.shape[0]
+		if n == 1 and self.numberboxes[0].name == name:
+			self.numberboxes = None
+		else:
+			_temp = np.empty((n-1), dtype=object)
+			i = 0
+			for val in self.numberboxes:
+				if val.name == name: continue
+				elif np.equal(i, n): raise NameError(f"Numberbox with name '{name}' does not exist")
+				_temp[i] = val
+				i += 1
+			else: self.numberboxes = _temp
+	def get_numberbox(self, name):
+		if self.numberboxes is None: raise IndexError("Numberboxes is empty")
+		for val in self.numberboxes:
+			if val.name == name: return val
+		else: raise NameError(f"Numberbox with name '{name}' does not exist")
+
+	def add_button(self, name, coordinates, text):
+		if self.buttons is None: self.buttons = np.empty((1,), dtype=object)
+		else:
+			for val in self.buttons:
+				if name.lower() == val.name.lower(): raise NameError(f"Button with name '{name}' already exists")
+			n = self.buttons.shape[0]
+			_temp = np.empty((n+1), dtype=object)
+			_temp[:-1] = self.buttons
+			self.buttons = _temp
+		self.buttons[self.buttons.shape[0]-1] = button(name, coordinates, text)
+	def remove_button(self, name):
+		if self.buttons is None: raise IndexError("Buttons is empty")
+		n = self.buttons.shape[0]
+		if n == 1 and self.buttons[0].name == name:
+			self.buttons = None
+		else:
+			_temp = np.empty((n-1), dtype=object)
+			i = 0
+			for val in self.buttons:
+				if val.name == name: continue
+				elif np.equal(i, n): raise NameError(f"Button with name '{name}' does not exist")
+				_temp[i] = val
+				i += 1
+			else: self.buttons = _temp
+	def get_button(self, name):
+		if self.buttons is None: raise IndexError("Buttons is empty")
+		for val in self.buttons:
+			if val.name == name: return val
+		else: raise NameError(f"Button with name '{name}' does not exist")
+
+	def add_label(self, name, coordinates, text):
+		if self.labels is None: self.labels = np.empty((1,), dtype=object)
+		else:
+			for val in self.labels:
+				if name.lower() == val.name.lower(): raise NameError(f"Label with name '{name}' already exists")
+			n = self.labels.shape[0]
+			_temp = np.empty((n+1), dtype=object)
+			_temp[:-1] = self.labels
+			self.labels = _temp
+		self.labels[self.labels.shape[0]-1] = label(name, coordinates, text)
+	def remove_label(self, name):
+		if self.labels is None: raise IndexError("Labels is empty")
+		n = self.labels.shape[0]
+		if n == 1 and self.labels[0].name == name:
+			self.labels = None
+		else:
+			_temp = np.empty((n-1), dtype=object)
+			i = 0
+			for val in self.labels:
+				if val.name == name: continue
+				elif np.equal(i, n): raise NameError(f"Label with name '{name}' does not exist")
+				_temp[i] = val
+				i += 1
+			else: self.labels = _temp
+	def get_label(self, name):
+		if self.labels is None: raise IndexError("Labels is empty")
+		for val in self.labels:
+			if val.name == name: return val
+		else: raise NameError(f"Label with name '{name}' does not exist")
