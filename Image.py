@@ -1,23 +1,23 @@
 __author__ = 'jsh0x'
-__version__ = '1.0.0'
+__version__ = '2.0.0'
 
 import os
-from secrets import randbelow as rand
+import sys
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw
-from Convert import hex2rgb, index2coord, rgb2hex
+from Convert import hex2rgb
 from Constants import CHARACTER_ARRAYS
 from Zmath import total_differential as t_diff
 import datetime
+from matplotlib import pyplot as plt
 
 
 
-def space_conflict(roi1, roi2):
-	roi1 = [(x,y) for y in np.arange(roi1[1],roi1[3]) for x in np.arange(roi1[0],roi1[2])]
-	roi2 = [(x,y) for y in np.arange(roi2[1],roi2[3]) for x in np.arange(roi2[0],roi2[2]) if (x,y) in roi1]
-	if len(roi2) > 0: return True
-	else: return False
+def space_conflict(roi, roi_list):
+	retval = [roi2 for roi2 in roi_list if (np.abs(np.subtract(roi[0],roi2[0])) <= roi[2]-roi[0]) and (np.abs(np.subtract(roi[1],roi2[1])) <= roi[3]-roi[1])]
+	if len(retval) <= 1: return None
+	else: return retval
 
 def get_gradient(image):
 	"""finds the anti-derivative of an image's RGB values"""
@@ -64,82 +64,141 @@ def get_gradient(image):
 	return ret_img.mean(axis=2)"""
 	return ret_img
 
+def get_bounds(roi_list):
+	minx = sys.maxsize
+	miny = sys.maxsize
+	maxx = 0
+	maxy = 0
+	for x1,y1,x2,y2 in roi_list:
+		minx = min(minx, x1)
+		miny = min(miny, y1)
+		maxx = max(maxx, x2)
+		maxy = max(maxy, y2)
+	return tuple((minx, miny, maxx, maxy))
+
 def OCR(input_string, haystack_image, tolerance_threshold=10, roi=None):
-	#HIGHLY recommend tolerance thresholds < 20
+	#HIGHLY recommend tolerance thresholds < ?
 	if type(input_string) is not str: raise TypeError(f"Value 'input_string' must be type str, instead got type {type(input_string)}")
 	if len(input_string) == 0: raise ValueError("Value 'input_string' is empty")
 	if type(haystack_image) is str and not os.path.exists(haystack_image): raise FileNotFoundError(f"Image directory '{haystack_image}' not found")
-	elif type(haystack_image) is str: img = np.array(Image.open(haystack_image).convert('RGB'), dtype=np.int16)
-	elif type(haystack_image) is Image.Image: img = np.array(haystack_image.convert('RGB'), dtype=np.int16)
-	elif type(haystack_image) is np.ndarray: img = haystack_image
+	elif type(haystack_image) is str: img = np.array(Image.open(haystack_image).convert('L'), dtype=np.int16)
+	elif type(haystack_image) is Image.Image: img = np.array(haystack_image.convert('L'), dtype=np.int16)
+	elif type(haystack_image) is np.ndarray: img = np.asarray(haystack_image, dtype=np.int16)
 	else: raise TypeError(f"Value 'haystack_image' must be a PIL Image-Object, an image directory, or an image array, instead got {type(haystack_image)}")
 	retval_dict = {}
-	im = Image.fromarray(np.asarray(img, dtype=np.uint8))
+	master_list = []
+	old = tolerance_threshold
+	im = Image.fromarray(np.asarray(img, dtype=np.uint8)).convert("RGB")
 	draw = ImageDraw.Draw(im)
-	if roi is None:
-		char = input_string[0]
-		img2 = np.copy(img)
-		char_array = CHARACTER_ARRAYS[char]
-		char_array2 = np.zeros((char_array.shape[0], char_array.shape[1], 3))
-		for y in np.arange(char_array.shape[0]):
-			for x in np.arange(char_array.shape[1]):
-				char_array2[y,x]=hex2rgb(char_array[y,x])
-		char_array3 = char_array2.mean(axis=2)
-		for y in np.arange(img2.shape[0]-char_array3.shape[0]):
-			for x in np.arange(img2.shape[1]-char_array3.shape[1]):
-				try: krn = (img2[y:y+char_array3.shape[0],x:x+char_array3.shape[1]]).mean(axis=2)
-				except IndexError: krn = (img2[y:y+char_array3.shape[0],x:x+char_array3.shape[1]])
-				if np.abs(np.subtract(krn, char_array3)).mean() < tolerance_threshold:
-					if roi is None: roi = [(x, y, x + char_array.shape[1], y + char_array.shape[0])]
-					else: roi.append((x, y, x + char_array.shape[1], y + char_array.shape[0]))
+	for char in input_string:
+		if roi is None:
+			img2 = np.copy(img)
+			char_array = CHARACTER_ARRAYS[char]
+			for y in np.arange(img2.shape[0]-char_array.shape[0]):
+				for x in np.arange(img2.shape[1]-char_array.shape[1]):
+					krn = (img2[y:y+char_array.shape[0],x:x+char_array.shape[1]])
+					if np.abs(np.subtract(krn, char_array)).mean() < tolerance_threshold:
+						print(char, x, y, np.abs(np.subtract(krn, char_array)).mean())
+						if roi is None: roi = [(x, y, x + char_array.shape[1], y + char_array.shape[0])]
+						else: roi.append((x, y, x + char_array.shape[1], y + char_array.shape[0]))
+			roi2 = roi
 		else:
-			old = tolerance_threshold
-			for char in input_string[1:]:
-				if char == ('l' or 'I'):
-					tolerance_threshold = 10
-				else: tolerance_threshold = old
-				for i in range(len(roi)):
-					x1, y1, x2, y2 = roi.pop(0)
-					#color = (rand(256), rand(256), rand(256))
-					#color2 = (rand(256), rand(256), rand(256))
-					#size=2
-					char_array = CHARACTER_ARRAYS[char]
-					y3 = np.add(np.floor_divide((y2-y1),2), y1)
-					y4 = y3 + char_array.shape[0]
-					y3 = y3 - char_array.shape[0]
-					x4 = np.add(np.add(x2,char_array.shape[1]), np.floor_divide(char_array.shape[1], 2))
-					img2 = np.copy(img[min(y1,y3):max(y2,y4), x1:x4])
-					print(min(y1,y3),max(y2,y4), x1,x4)
-					#draw.ellipse((x1 - size, y1 - size, x1 + size, y1 + size), fill=color)
-					#draw.ellipse((x2 - size, y2 - size, x2 + size, y2 + size), fill=color)
-					#draw.ellipse((x1 - size, min(y1, y3) - size, x1 + size, min(y1, y3) + size), fill=color2)
-					#draw.ellipse((x3 - size, max(y2, y4) - size, x3 + size, max(y2, y4) + size), fill=color2)
-					char_array2 = np.zeros((char_array.shape[0], char_array.shape[1], 3))
-					for y in np.arange(char_array.shape[0]):
-						for x in np.arange(char_array.shape[1]):
-							char_array2[y, x] = hex2rgb(char_array[y, x])
-					char_array3 = char_array2.mean(axis=2)
-					for y in np.arange(img2.shape[0] - char_array3.shape[0]):
-						for x in np.arange(img2.shape[1] - char_array3.shape[1]):
-							try: krn = (img2[y:y + char_array3.shape[0], x:x + char_array3.shape[1]]).mean(axis=2)
-							except IndexError: krn = (img2[y:y + char_array3.shape[0], x:x + char_array3.shape[1]])
-							if np.abs(np.subtract(krn, char_array3)).mean() < tolerance_threshold:
-								print(char, x, y, np.abs(np.subtract(krn, char_array3)).mean())
-								roi.append((min(x+x1, x1), min(y+y1, y1), max(x + char_array.shape[1] + x1, x2), min(y + char_array.shape[0] + y1, y2)))
+
+			if char == 'l' or char == 'I':
+				tolerance_threshold = 20
 			else:
-				print(len(roi))
-				target = 0
-				count = 0
-				for char in input_string:
-					char_array = CHARACTER_ARRAYS[char]
-					target += char_array.shape[1]
-				for x1, y1, x2, y2 in roi:
-					if target - (x2-x1) < 10:
-						count += 1
-						print(target, x2-x1, y2-y1)
-						color = (255, 0, 0)
-						draw.rectangle((x1, y1, x2, y2), outline=color)
-	print(count)
+				tolerance_threshold = old
+			"""
+			im2 = Image.fromarray(haystack_image).convert("RGB")
+			draw = ImageDraw.Draw(im2)"""
+			#378,417
+			"""print(len(roi))
+			conflict_set = set()
+			for roi2 in roi:
+				res = space_conflict(roi2, roi)
+				if res is not None:
+					conflict_set.add(tuple(res))"""
+			#print(conflict_set)
+			"""print(len(conflict_set))
+			for sc in conflict_set:
+				bnd = get_bounds(sc)
+				for s in sc:
+					try: roi.remove(s)
+					except: pass
+				roi.append(bnd)
+			print(len(roi))"""
+			"""
+			for x1,y1,x2,y2 in roi:
+				draw.rectangle((x1,y1,x2,y2), outline=(255, 0, 0))
+			#im2.show()"""
+			roi2 = []
+			for x1, y1, x2, y2 in roi:
+				print(x1,y1,x2,y2)
+				#color = (rand(256), rand(256), rand(256))
+				#color2 = (rand(256), rand(256), rand(256))
+				#size=2
+				#rem_list.append((x1, y1, x2, y2))
+				char_array = CHARACTER_ARRAYS[char]
+				y4 = y2 + char_array.shape[0]
+				y3 = y2 - char_array.shape[0]
+				x4 = np.add(x2, char_array.shape[1])
+				x3 = np.subtract(x2, np.floor_divide(char_array.shape[1], 2))
+				img2 = np.copy(img[y3:y4, x3:x4])
+				# img2 = np.copy(img[min(y1,y3):max(y2,y4), x1:x4])
+				#print(min(y1,y3),max(y2,y4), x1,x4)
+				#draw.ellipse((x1 - size, y1 - size, x1 + size, y1 + size), fill=color)
+				#draw.ellipse((x2 - size, y2 - size, x2 + size, y2 + size), fill=color)
+				#draw.ellipse((x1 - size, min(y1, y3) - size, x1 + size, min(y1, y3) + size), fill=color2)
+				#draw.ellipse((x3 - size, max(y2, y4) - size, x3 + size, max(y2, y4) + size), fill=color2)
+				for y in np.arange(img2.shape[0]-char_array.shape[0]):
+					for x in np.arange(img2.shape[1] - char_array.shape[1]):
+						krn = (img2[y:y+char_array.shape[0], x:x+char_array.shape[1]])
+						if krn.shape == char_array.shape:
+							if np.abs(np.subtract(krn, char_array)).mean() < tolerance_threshold:
+								print(char, x, y, np.abs(np.subtract(krn, char_array)).mean(), (x2-x, y2-y, (x2-x)+char_array.shape[1], (y2-y)-char_array.shape[0]))
+								roi2.append((x2-x, y2-y, (x2-x)+char_array.shape[1], (y2-y)-char_array.shape[0]))
+				#for y in np.arange(img2.shape[0]-char_array.shape[0]):
+				#	krn = (img2[y:y + char_array.shape[0], :char_array.shape[1]])
+				#	if np.abs(np.subtract(krn, char_array)).mean() < tolerance_threshold:
+				#		print(char, x, y, np.abs(np.subtract(krn, char_array)).mean())
+				#		roi2.append((x2, y + y2, x4, y + char_array.shape[0] + y2,))
+		"""conflict_set = set()
+		for roi3 in roi2:
+			res = space_conflict(roi3, roi2)
+			if res is not None:
+				conflict_set.add(tuple(res))
+		for sc in conflict_set:
+			bnd = get_bounds(sc)
+			for s in sc:
+				try:
+					roi2.remove(s)
+				except:
+					pass
+			roi2.append(bnd)"""
+		master_list.append(roi2)
+		roi = roi2
+	conflict_set = set()
+	print(len(master_list))
+	"""for roi in master_list:
+		for roi2 in roi:
+			res = space_conflict(roi2, roi)
+			if res is not None:
+				conflict_set.add(tuple(res))
+		for sc in conflict_set:
+			bnd = get_bounds(sc)
+			for s in sc:
+				try: roi.remove(s)
+				except: pass
+			roi.append(bnd)"""
+	print(len(master_list))
+	count = 0
+	for roi in master_list:
+		count+= 1
+		print(count)
+		for x1, y1, x2, y2 in roi:
+			color = (255, 0, 0)
+			print(x1,y1,x2,y2)
+			draw.rectangle((x1, y1, x2, y2), outline=color)
 	im.show()
 
 
@@ -147,12 +206,87 @@ def OCR(input_string, haystack_image, tolerance_threshold=10, roi=None):
 #OCR('SRO', 'Q:/autopaper/Untitled4.png', tolerance_threshold=12)
 #OCR('Unit', get_gradient('Q:/autopaper/Untitled.jpg'), tolerance_threshold=24)
 now=datetime.datetime.today()
-im2 = np.array(Image.open('Q:/autopaper/Untitled2.png').convert('L'))
+im2 = np.array(Image.open('Untitled2.png').convert('L'))
 #print(im2.shape)
-im = Image.fromarray(get_gradient(im2))
+#OCR("General", im2, 31)
+
+#im = Image.fromarray(get_gradient(im2))
 #print(datetime.datetime.today()-now)
 #im.show()
-im.save('Untitled2.png')
+#im.save('Untitled2.png')
 # TODO: Handle multiple words separated by spaces
 # COLOR= 108.622931 seconds
 # GRAY=  39.256156 seconds
+
+def dev(input_string, haystack_image, threshold=0.8, roi=None):
+	for i,char in enumerate(input_string):
+		#print(i)
+		needle_image = CHARACTER_ARRAYS[char]
+		w, h = needle_image.shape[::-1]
+		k2 = np.array([(x,y) for y,x in np.ndindex(haystack_image.shape[0]-h, haystack_image.shape[1]-w) if np.mean(np.abs(np.subtract(haystack_image[y:y+h,x:x+w],needle_image)))<threshold])
+		print(len(k2[:]))
+		for x,y in k2:
+			plt.imshow(haystack_image[y:y+h,x:x+22], cmap='gray')
+			print(np.mean(np.abs(np.subtract(haystack_image[y:y+h,x:x+w],needle_image))))
+			plt.show()
+		quit()
+		for xy,k in k2[:]:
+			if np.abs(np.subtract(needle_image.mean(), k)) < 0.5:
+				print(xy, needle_image.mean(), k)
+		a = np.where(needle_image.mean(axis=(0,1)) == haystack_image.mean(), needle_image, 0)
+		print(a)
+
+
+
+		quit()
+		if roi is None:
+			roi = []
+			res = cv2.matchTemplate(haystack_image, needle_image, cv2.TM_CCOEFF_NORMED)
+			loc = np.where(res >= threshold)
+			for pt in zip(*loc[::-1]):
+				roi.append([(pt[0]+(w/2), (pt[1]+(h/2))-CHARACTER_ARRAYS[input_string[i+1]].shape[0],
+			                (pt[0]+(w/2))+(CHARACTER_ARRAYS[input_string[i+1]].shape[1]*2),
+			                (pt[1]+(h/2))+CHARACTER_ARRAYS[input_string[i+1]].shape[0]),
+			                (pt[0], pt[1], pt[0]+w, pt[1]+h)])
+			if not roi: return None
+		else:
+			roi3 = []
+			for roi2 in roi:
+				print(roi2)
+				x1,y1,x2,y2 = roi2[0]
+				old = roi2[1:]
+				print(old)
+				if x1 < 0:
+					x1 = 0
+				if y1 < 0:
+					y1 = 0
+				res = cv2.matchTemplate(haystack_image[int(y1):int(y2), int(x1):int(x2)], needle_image, cv2.TM_CCOEFF_NORMED)
+				print(char, res.max())
+				loc = np.where(res >= threshold)
+				for pt in zip(*loc[::-1]):
+					plt.imshow(haystack_image[int(pt[1]+y1):int(pt[1]+y1 + h), int(pt[0]+x1):int(pt[0]+x1 + w)], cmap='gray')
+					#plt.show()
+					roi3.append([(pt[0]+x1 + (w / 2), (pt[1]+y1 + (h / 2)) - CHARACTER_ARRAYS[input_string[i + 1]].shape[0],
+					            (pt[0]+x1 + (w / 2)) + (CHARACTER_ARRAYS[input_string[i + 1]].shape[1] * 3),
+					            (pt[1]+y1 + (h / 2)) + CHARACTER_ARRAYS[input_string[i + 1]].shape[0]),
+					             old+[(int(pt[0]+x1), int(pt[1]+y1), int(pt[0]+x1 + w), int(pt[1]+y1 + h))]])
+			roi = roi3
+			if not roi: return None
+		if i == (len(input_string)-2):
+			return roi
+a = "SRO"
+b = []
+c = 0
+for char in a:
+	b.append(CHARACTER_ARRAYS[char].shape[1]-1)
+	c += (CHARACTER_ARRAYS[char].shape[1])
+b = np.mean(b)*len(a)
+print(np.log(7), np.log(3))
+a = dev("SRO", im2, 20)
+#for b in a:
+#	print(b)
+#a = np.array([[16,64,16],[32,255,32],[16,64,16]])
+#print(a)
+#b = np.where(a > 16, a, 0)
+#for c in b:
+#	print(c)

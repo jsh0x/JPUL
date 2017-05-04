@@ -3,7 +3,6 @@ __version__ = '3.0.0'
 
 
 import numpy as np
-from Convert import hex2rgb
 from Constants import FORM_LIST
 
 
@@ -617,3 +616,6 @@ class Form:
 		for val in self.labels:
 			if val.name == name: return val
 		else: raise NameError(f"Label with name '{name}' does not exist")
+
+
+units_form = Form("Units")
