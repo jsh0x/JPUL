@@ -206,7 +206,7 @@ def OCR(input_string, haystack_image, tolerance_threshold=10, roi=None):
 #OCR('SRO', 'Q:/autopaper/Untitled4.png', tolerance_threshold=12)
 #OCR('Unit', get_gradient('Q:/autopaper/Untitled.jpg'), tolerance_threshold=24)
 now=datetime.datetime.today()
-im2 = np.array(Image.open('Untitled2.png').convert('L'))
+im2 = np.array(Image.open('Untitled2.png').convert('L'), dtype=np.int16)
 #print(im2.shape)
 #OCR("General", im2, 31)
 
@@ -218,71 +218,128 @@ im2 = np.array(Image.open('Untitled2.png').convert('L'))
 # COLOR= 108.622931 seconds
 # GRAY=  39.256156 seconds
 
-def dev(input_string, haystack_image, threshold=0.8, roi=None):
-	for i,char in enumerate(input_string):
-		#print(i)
-		needle_image = CHARACTER_ARRAYS[char]
-		w, h = needle_image.shape[::-1]
-		k2 = np.array([(x,y) for y,x in np.ndindex(haystack_image.shape[0]-h, haystack_image.shape[1]-w) if np.mean(np.abs(np.subtract(haystack_image[y:y+h,x:x+w],needle_image)))<threshold])
-		print(len(k2[:]))
-		for x,y in k2:
-			plt.imshow(haystack_image[y:y+h,x:x+22], cmap='gray')
-			print(np.mean(np.abs(np.subtract(haystack_image[y:y+h,x:x+w],needle_image))))
-			plt.show()
-		quit()
-		for xy,k in k2[:]:
-			if np.abs(np.subtract(needle_image.mean(), k)) < 0.5:
-				print(xy, needle_image.mean(), k)
-		a = np.where(needle_image.mean(axis=(0,1)) == haystack_image.mean(), needle_image, 0)
-		print(a)
+def dev(input_string: str, haystack_image, threshold=0.8, roi=None, bold=False):
+	string_width = 0
+	string_height = 8
+	contains_upper = False
+	contains_under = False
+	for i in range(len(input_string)):
+		char = input_string[i]
+		val_h = CHARACTER_ARRAYS[char].shape[0]
+		val_w = CHARACTER_ARRAYS[char].shape[1]
+		if val_h >= 10: contains_upper = True
+		if char == "y" or char == "j" or char == "q" or char == "p" or char == "g": contains_under = True
+		elif not bold:
+			if i == 0: string_width += val_w
+			elif input_string[i-1].isupper(): string_width += val_w
+			elif input_string[i-1].islower(): string_width += (val_w-1)
+		else: string_width += (val_w-1)
+		print(string_width)
+	if contains_upper: string_height += 3
+	if contains_under: string_height += 2
+
+	needle_image = np.zeros((string_height, string_width), dtype=np.int16)
+	print(needle_image.shape)
+	next_point = 0
+	for i in range(len(input_string)):
+		char = input_string[i]
+		val_h = CHARACTER_ARRAYS[char].shape[0]
+		val_w = CHARACTER_ARRAYS[char].shape[1]
+		if val_h == 10: base_h = 1
+		elif val_h == 11: base_h = 0
+		elif contains_upper: base_h = 3
+		else: base_h = 0
+
+		print(char, next_point, next_point+val_w)
+		needle_image[base_h:base_h+val_h, next_point:next_point+val_w] = np.add(needle_image[base_h:base_h+val_h, next_point:next_point+val_w], CHARACTER_ARRAYS[char])
+		if not bold and char.isupper(): next_point += val_w
+		elif i < (len(input_string)-1) and bold:
+			if CHARACTER_ARRAYS[input_string[i]].shape[1] < 7: next_point += (val_w-2)
+			else: next_point += (val_w-1)
+		else: next_point += (val_w-1)
+	w, h = needle_image.shape[::-1]
+	if bold:
+		needle_image = np.where(needle_image[:,:] > 0, needle_image[:,:]+16, needle_image[:,:])
+		needle_image = np.where(needle_image[:, :] > 128, needle_image[:, :] + 16, needle_image[:,:])
+	#for y, x in np.ndindex(haystack_image.shape[0] - h, haystack_image.shape[1] - w):
+	#	if np.mean(np.abs(np.subtract(haystack_image[y:y + h, x:x + w], needle_image))) < 37:
+	#		print(np.mean(np.abs(np.subtract(haystack_image[y:y + h, x:x + w], needle_image))))
+	res = np.array([(x,y,w,h) for y,x in np.ndindex(haystack_image.shape[0]-h, haystack_image.shape[1]-w) if np.mean(np.abs(np.subtract(haystack_image[y:y + h, x:x + w], needle_image)))<threshold])
+	for x,y,w,h in res:
+		print(np.mean(np.abs(np.subtract(haystack_image[y:y + h, x:x + w], needle_image))), np.abs(np.mean(np.subtract(haystack_image[y:y + h, x:x + w], needle_image))))
+		img = np.empty((h*2, w), dtype=np.int16)
+		img[:h] = haystack_image[y:y + h, x:x + w]
+		img[h:] = needle_image
+		#for i in range(3):
+		#	print(np.abs(np.subtract(img[4+i,:], needle_image[4+i,:])).tolist())
+		#print()
+		plt.imshow(img, cmap='gray')
+		plt.show()
+	quit()
+	k2 = []
+	for xy,roi in k2:
+		roi_list = [xy]
+		for char in input_string[1:]:
+			needle_image = CHARACTER_ARRAYS[char]
+			w, h = needle_image.shape[::-1]
+			for y, x in np.ndindex(roi.shape[0], roi.shape[1] - w):
+				print(np.mean(np.abs(np.subtract(roi[y:y + h, x:x + w], needle_image))))
+			k3 = np.array([((xy[0]+(xy[2]-1)+x,xy[1]+y,w,h), roi[:,x+(w-1):]) for y, x in np.ndindex(roi.shape[0], roi.shape[1]-w) if np.mean(np.abs(np.subtract(roi[y:y + h, x:x + w], needle_image))) < threshold])
+			for a in k3:
+				roi_list.append(a)
+			#plt.imshow(k, cmap='gray')
+			#plt.show()
+	print(roi_list)
 
 
 
-		quit()
-		if roi is None:
-			roi = []
-			res = cv2.matchTemplate(haystack_image, needle_image, cv2.TM_CCOEFF_NORMED)
+	quit()
+	if roi is None:
+		roi = []
+		res = cv2.matchTemplate(haystack_image, needle_image, cv2.TM_CCOEFF_NORMED)
+		loc = np.where(res >= threshold)
+		for pt in zip(*loc[::-1]):
+			roi.append([(pt[0]+(w/2), (pt[1]+(h/2))-CHARACTER_ARRAYS[input_string[i+1]].shape[0],
+		                (pt[0]+(w/2))+(CHARACTER_ARRAYS[input_string[i+1]].shape[1]*2),
+		                (pt[1]+(h/2))+CHARACTER_ARRAYS[input_string[i+1]].shape[0]),
+		                (pt[0], pt[1], pt[0]+w, pt[1]+h)])
+		if not roi: return None
+	else:
+		roi3 = []
+		for roi2 in roi:
+			print(roi2)
+			x1,y1,x2,y2 = roi2[0]
+			old = roi2[1:]
+			print(old)
+			if x1 < 0:
+				x1 = 0
+			if y1 < 0:
+				y1 = 0
+			res = cv2.matchTemplate(haystack_image[int(y1):int(y2), int(x1):int(x2)], needle_image, cv2.TM_CCOEFF_NORMED)
+			print(char, res.max())
 			loc = np.where(res >= threshold)
 			for pt in zip(*loc[::-1]):
-				roi.append([(pt[0]+(w/2), (pt[1]+(h/2))-CHARACTER_ARRAYS[input_string[i+1]].shape[0],
-			                (pt[0]+(w/2))+(CHARACTER_ARRAYS[input_string[i+1]].shape[1]*2),
-			                (pt[1]+(h/2))+CHARACTER_ARRAYS[input_string[i+1]].shape[0]),
-			                (pt[0], pt[1], pt[0]+w, pt[1]+h)])
-			if not roi: return None
-		else:
-			roi3 = []
-			for roi2 in roi:
-				print(roi2)
-				x1,y1,x2,y2 = roi2[0]
-				old = roi2[1:]
-				print(old)
-				if x1 < 0:
-					x1 = 0
-				if y1 < 0:
-					y1 = 0
-				res = cv2.matchTemplate(haystack_image[int(y1):int(y2), int(x1):int(x2)], needle_image, cv2.TM_CCOEFF_NORMED)
-				print(char, res.max())
-				loc = np.where(res >= threshold)
-				for pt in zip(*loc[::-1]):
-					plt.imshow(haystack_image[int(pt[1]+y1):int(pt[1]+y1 + h), int(pt[0]+x1):int(pt[0]+x1 + w)], cmap='gray')
-					#plt.show()
-					roi3.append([(pt[0]+x1 + (w / 2), (pt[1]+y1 + (h / 2)) - CHARACTER_ARRAYS[input_string[i + 1]].shape[0],
-					            (pt[0]+x1 + (w / 2)) + (CHARACTER_ARRAYS[input_string[i + 1]].shape[1] * 3),
-					            (pt[1]+y1 + (h / 2)) + CHARACTER_ARRAYS[input_string[i + 1]].shape[0]),
-					             old+[(int(pt[0]+x1), int(pt[1]+y1), int(pt[0]+x1 + w), int(pt[1]+y1 + h))]])
-			roi = roi3
-			if not roi: return None
-		if i == (len(input_string)-2):
-			return roi
-a = "SRO"
-b = []
-c = 0
-for char in a:
-	b.append(CHARACTER_ARRAYS[char].shape[1]-1)
-	c += (CHARACTER_ARRAYS[char].shape[1])
-b = np.mean(b)*len(a)
-print(np.log(7), np.log(3))
-a = dev("SRO", im2, 20)
+				plt.imshow(haystack_image[int(pt[1]+y1):int(pt[1]+y1 + h), int(pt[0]+x1):int(pt[0]+x1 + w)], cmap='gray')
+				#plt.show()
+				roi3.append([(pt[0]+x1 + (w / 2), (pt[1]+y1 + (h / 2)) - CHARACTER_ARRAYS[input_string[i + 1]].shape[0],
+				            (pt[0]+x1 + (w / 2)) + (CHARACTER_ARRAYS[input_string[i + 1]].shape[1] * 3),
+				            (pt[1]+y1 + (h / 2)) + CHARACTER_ARRAYS[input_string[i + 1]].shape[0]),
+				             old+[(int(pt[0]+x1), int(pt[1]+y1), int(pt[0]+x1 + w), int(pt[1]+y1 + h))]])
+		roi = roi3
+		if not roi: return None
+	if i == (len(input_string)-2):
+		return roi
+"""im = np.array(Image.open("figure_1.png"), dtype=np.int16)
+im2 = np.array(Image.open("figure_2.png"), dtype=np.int16)
+im2 = np.where(im2[:,:] > 0, im2[:,:]+16, 0)
+im3 = np.abs(np.subtract(im,im2))
+im4 = np.mean(np.abs(np.subtract(im,im2)))
+for row,row2 in zip(im,im2):
+	print(row.mean())
+	print(row2.mean())
+	print()
+print(np.mean(im), np.mean(im2))"""
+a = dev("General", im2, 10, bold=True)
 #for b in a:
 #	print(b)
 #a = np.array([[16,64,16],[32,255,32],[16,64,16]])
