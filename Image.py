@@ -218,71 +218,103 @@ im2 = np.array(Image.open('Untitled2.png').convert('L'))
 # COLOR= 108.622931 seconds
 # GRAY=  39.256156 seconds
 
-def dev(input_string, haystack_image, threshold=0.8, roi=None):
-	for i,char in enumerate(input_string):
-		#print(i)
-		needle_image = CHARACTER_ARRAYS[char]
-		w, h = needle_image.shape[::-1]
-		k2 = np.array([(x,y) for y,x in np.ndindex(haystack_image.shape[0]-h, haystack_image.shape[1]-w) if np.mean(np.abs(np.subtract(haystack_image[y:y+h,x:x+w],needle_image)))<threshold])
-		print(len(k2[:]))
-		for x,y in k2:
-			plt.imshow(haystack_image[y:y+h,x:x+22], cmap='gray')
-			print(np.mean(np.abs(np.subtract(haystack_image[y:y+h,x:x+w],needle_image))))
-			plt.show()
-		quit()
-		for xy,k in k2[:]:
-			if np.abs(np.subtract(needle_image.mean(), k)) < 0.5:
-				print(xy, needle_image.mean(), k)
-		a = np.where(needle_image.mean(axis=(0,1)) == haystack_image.mean(), needle_image, 0)
-		print(a)
+def dev(input_string: str, haystack_image, threshold=0.8, roi=None):
+	string_width = 0
+	string_height = 8
+	contains_upper = False
+	contains_under = False
+	for i in range(len(input_string)):
+		char = input_string[i]
+		val_h = CHARACTER_ARRAYS[char].shape[0]
+		val_w = CHARACTER_ARRAYS[char].shape[1]
+		if val_h >= 10: contains_upper = True
+		if char == "y" or char == "j" or char == "q" or char == "p" or char == "g": contains_under = True
+		if i == 0: string_width += val_w
+		elif input_string[i-1].isupper(): string_width += val_w
+		elif input_string[i-1].islower(): string_width += (val_w-1)
+	if contains_upper: string_height += 3
+	if contains_under: string_height += 2
+
+	needle_image = np.zeros((string_height, string_width), dtype=np.int8)
+
+	next_point = 0
+	for i in range(len(input_string)):
+		char = input_string[i]
+		val_h = CHARACTER_ARRAYS[char].shape[0]
+		val_w = CHARACTER_ARRAYS[char].shape[1]
+		print(char)
+		if val_h == 10: base_h = 1
+		elif val_h == 11: base_h = 0
+		elif contains_upper: base_h = 3
+		else: base_h = 0
+		needle_image[base_h:base_h+val_h, next_point:next_point+val_w] = np.add(needle_image[base_h:base_h+val_h, next_point:next_point+val_w], CHARACTER_ARRAYS[char])
+		if char.isupper(): next_point += val_w
+		elif char.islower(): next_point += (val_w-1)
+	im = np.array(Image.open("COMPARE2.png").convert('L'), dtype=np.int8)
+	im = np.zeros((11,40),dtype=np.int8)
+	res = np.abs(np.mean(needle_image-im))
+	print(res)
+
+
+	quit()
+	#needle_image = CHARACTER_ARRAYS[input_string[0]]
+	w, h = needle_image.shape[::-1]
+	k2 = np.array([((x,y,w,h), haystack_image[y:y+h,x+(w-1):x+string_width]) for y,x in np.ndindex(haystack_image.shape[0]-h, haystack_image.shape[1]-w) if np.mean(np.abs(np.subtract(haystack_image[y:y+h,x:x+w],needle_image)))<threshold])
+	roi_master_list = []
+	for xy,roi in k2:
+		roi_list = [xy]
+		for char in input_string[1:]:
+			needle_image = CHARACTER_ARRAYS[char]
+			w, h = needle_image.shape[::-1]
+			for y, x in np.ndindex(roi.shape[0], roi.shape[1] - w):
+				print(np.mean(np.abs(np.subtract(roi[y:y + h, x:x + w], needle_image))))
+			k3 = np.array([((xy[0]+(xy[2]-1)+x,xy[1]+y,w,h), roi[:,x+(w-1):]) for y, x in np.ndindex(roi.shape[0], roi.shape[1]-w) if np.mean(np.abs(np.subtract(roi[y:y + h, x:x + w], needle_image))) < threshold])
+			for a in k3:
+				roi_list.append(a)
+			#plt.imshow(k, cmap='gray')
+			#plt.show()
+	print(roi_list)
 
 
 
-		quit()
-		if roi is None:
-			roi = []
-			res = cv2.matchTemplate(haystack_image, needle_image, cv2.TM_CCOEFF_NORMED)
+	quit()
+	if roi is None:
+		roi = []
+		res = cv2.matchTemplate(haystack_image, needle_image, cv2.TM_CCOEFF_NORMED)
+		loc = np.where(res >= threshold)
+		for pt in zip(*loc[::-1]):
+			roi.append([(pt[0]+(w/2), (pt[1]+(h/2))-CHARACTER_ARRAYS[input_string[i+1]].shape[0],
+		                (pt[0]+(w/2))+(CHARACTER_ARRAYS[input_string[i+1]].shape[1]*2),
+		                (pt[1]+(h/2))+CHARACTER_ARRAYS[input_string[i+1]].shape[0]),
+		                (pt[0], pt[1], pt[0]+w, pt[1]+h)])
+		if not roi: return None
+	else:
+		roi3 = []
+		for roi2 in roi:
+			print(roi2)
+			x1,y1,x2,y2 = roi2[0]
+			old = roi2[1:]
+			print(old)
+			if x1 < 0:
+				x1 = 0
+			if y1 < 0:
+				y1 = 0
+			res = cv2.matchTemplate(haystack_image[int(y1):int(y2), int(x1):int(x2)], needle_image, cv2.TM_CCOEFF_NORMED)
+			print(char, res.max())
 			loc = np.where(res >= threshold)
 			for pt in zip(*loc[::-1]):
-				roi.append([(pt[0]+(w/2), (pt[1]+(h/2))-CHARACTER_ARRAYS[input_string[i+1]].shape[0],
-			                (pt[0]+(w/2))+(CHARACTER_ARRAYS[input_string[i+1]].shape[1]*2),
-			                (pt[1]+(h/2))+CHARACTER_ARRAYS[input_string[i+1]].shape[0]),
-			                (pt[0], pt[1], pt[0]+w, pt[1]+h)])
-			if not roi: return None
-		else:
-			roi3 = []
-			for roi2 in roi:
-				print(roi2)
-				x1,y1,x2,y2 = roi2[0]
-				old = roi2[1:]
-				print(old)
-				if x1 < 0:
-					x1 = 0
-				if y1 < 0:
-					y1 = 0
-				res = cv2.matchTemplate(haystack_image[int(y1):int(y2), int(x1):int(x2)], needle_image, cv2.TM_CCOEFF_NORMED)
-				print(char, res.max())
-				loc = np.where(res >= threshold)
-				for pt in zip(*loc[::-1]):
-					plt.imshow(haystack_image[int(pt[1]+y1):int(pt[1]+y1 + h), int(pt[0]+x1):int(pt[0]+x1 + w)], cmap='gray')
-					#plt.show()
-					roi3.append([(pt[0]+x1 + (w / 2), (pt[1]+y1 + (h / 2)) - CHARACTER_ARRAYS[input_string[i + 1]].shape[0],
-					            (pt[0]+x1 + (w / 2)) + (CHARACTER_ARRAYS[input_string[i + 1]].shape[1] * 3),
-					            (pt[1]+y1 + (h / 2)) + CHARACTER_ARRAYS[input_string[i + 1]].shape[0]),
-					             old+[(int(pt[0]+x1), int(pt[1]+y1), int(pt[0]+x1 + w), int(pt[1]+y1 + h))]])
-			roi = roi3
-			if not roi: return None
-		if i == (len(input_string)-2):
-			return roi
-a = "SRO"
-b = []
-c = 0
-for char in a:
-	b.append(CHARACTER_ARRAYS[char].shape[1]-1)
-	c += (CHARACTER_ARRAYS[char].shape[1])
-b = np.mean(b)*len(a)
-print(np.log(7), np.log(3))
-a = dev("SRO", im2, 20)
+				plt.imshow(haystack_image[int(pt[1]+y1):int(pt[1]+y1 + h), int(pt[0]+x1):int(pt[0]+x1 + w)], cmap='gray')
+				#plt.show()
+				roi3.append([(pt[0]+x1 + (w / 2), (pt[1]+y1 + (h / 2)) - CHARACTER_ARRAYS[input_string[i + 1]].shape[0],
+				            (pt[0]+x1 + (w / 2)) + (CHARACTER_ARRAYS[input_string[i + 1]].shape[1] * 3),
+				            (pt[1]+y1 + (h / 2)) + CHARACTER_ARRAYS[input_string[i + 1]].shape[0]),
+				             old+[(int(pt[0]+x1), int(pt[1]+y1), int(pt[0]+x1 + w), int(pt[1]+y1 + h))]])
+		roi = roi3
+		if not roi: return None
+	if i == (len(input_string)-2):
+		return roi
+
+a = dev("General", im2, 20)
 #for b in a:
 #	print(b)
 #a = np.array([[16,64,16],[32,255,32],[16,64,16]])
