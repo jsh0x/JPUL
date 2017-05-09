@@ -233,13 +233,14 @@ def dev(input_string: str, haystack_image, threshold=0.8, roi=None, bold=False):
 			if i == 0: string_width += val_w
 			elif input_string[i-1].isupper(): string_width += val_w
 			elif input_string[i-1].islower(): string_width += (val_w-1)
+			elif input_string[i-1].isnumeric(): string_width += (val_w - 1)
+			else: string_width += (val_w - 1)
 		else: string_width += (val_w-1)
 		print(string_width)
 	if contains_upper: string_height += 3
 	if contains_under: string_height += 2
 
 	needle_image = np.zeros((string_height, string_width), dtype=np.int16)
-	print(needle_image.shape)
 	next_point = 0
 	for i in range(len(input_string)):
 		char = input_string[i]
@@ -252,9 +253,10 @@ def dev(input_string: str, haystack_image, threshold=0.8, roi=None, bold=False):
 
 		print(char, next_point, next_point+val_w)
 		needle_image[base_h:base_h+val_h, next_point:next_point+val_w] = np.add(needle_image[base_h:base_h+val_h, next_point:next_point+val_w], CHARACTER_ARRAYS[char])
-		if not bold and char.isupper(): next_point += val_w
+		if not bold and char.isupper(): next_point += val_w#-1
 		elif i < (len(input_string)-1) and bold:
 			if CHARACTER_ARRAYS[input_string[i]].shape[1] < 7: next_point += (val_w-2)
+			elif input_string[i] == '0': next_point += (val_w-2)
 			else: next_point += (val_w-1)
 		else: next_point += (val_w-1)
 	w, h = needle_image.shape[::-1]
@@ -268,8 +270,22 @@ def dev(input_string: str, haystack_image, threshold=0.8, roi=None, bold=False):
 	for x,y,w,h in res:
 		print(np.mean(np.abs(np.subtract(haystack_image[y:y + h, x:x + w], needle_image))), np.abs(np.mean(np.subtract(haystack_image[y:y + h, x:x + w], needle_image))))
 		img = np.empty((h*2, w), dtype=np.int16)
-		img[:h] = haystack_image[y:y + h, x:x + w]
-		img[h:] = needle_image
+		img2 = haystack_image[y:y + h, x:x + w]
+		img3 = needle_image
+		print("ROWS")
+		for row,row2 in zip(img2, img3):
+			print(np.mean(row))
+			print(np.mean(row2))
+			print(np.subtract(np.mean(row), np.mean(row2)))
+			print()
+		print("COLUMNS")
+		for col,col2 in zip(img2[:], img3[:]):
+			print(np.mean(col))
+			print(np.mean(col2))
+			print(np.subtract(np.mean(col), np.mean(col2)))
+			print()
+		img[:h] = img2
+		img[h:] = img3
 		#for i in range(3):
 		#	print(np.abs(np.subtract(img[4+i,:], needle_image[4+i,:])).tolist())
 		#print()
