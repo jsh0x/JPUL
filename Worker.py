@@ -1,5 +1,5 @@
-__version__ = '2.0.0'
 __author__ = 'jsh0x'
+__version__ = '2.0.0'
 
 import os, sys, logging, datetime
 import cv2
@@ -10,6 +10,14 @@ import numpy as np
 
 class Unit:
 	def __init__(self, serial_number:str, build:int, carrier:str, product:str, suffix:str):
+		if type(serial_number) is not str: raise TypeError
+		if len(serial_number) != 7: raise ValueError
+		if type(build) is not int: raise TypeError
+		if build < 100: raise ValueError
+		if carrier:
+			if carrier != "Verizon" and carrier != "Sprint": raise ValueError
+		if type(product) is not str: raise TypeError
+		if type(suffix) is not str: raise TypeError
 		self.serial_number = serial_number
 		self.build = build
 		self.carrier = carrier

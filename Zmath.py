@@ -1,5 +1,6 @@
 __author__ = 'jsh0x'
 __version__ = '2.0.0'
+
 import numpy as np
 
 def mode(ndarray):
