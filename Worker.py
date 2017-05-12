@@ -43,6 +43,7 @@ class Unit:
 	def get_suffix(self):
 		if self.suffix == "Monitoring": return "-M"
 		elif self.suffix == "Demo": return "-DEMO"
+		elif self.suffix == "Refurbished": return "-R"
 		else: return ""
 	def get_prefix(self):
 		#Returns build_prefix and serial_number_prefix for product and build
@@ -72,6 +73,9 @@ class MonitoringUnit(Unit):
 	def make_RTS(self):
 		pass
 		self.suffix = "RTS"
+	def make_Refurbished(self):
+		pass
+		self.suffix = "Refurbished"
 
 class DirectUnit(Unit):
 	def __init__(self, serial_number:str, build:int, product:str, customer_number:int, carrier:str=None):

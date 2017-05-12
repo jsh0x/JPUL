@@ -4,8 +4,8 @@ __version__ = '2.0.0'
 import pymssql as sql
 import Crypt
 
-k = 462758
-char_map = {1036: '0', 1038: '1', 8732: '2', 7215: '3', 2095: '4', 9270: '5', 4668: '6', 2109: '7', 2116: '8',
+_k = 462758
+_char_map = {1036: '0', 1038: '1', 8732: '2', 7215: '3', 2095: '4', 9270: '5', 4668: '6', 2109: '7', 2116: '8',
 	            1096: '9', 2124: 'a', 9303: 'b', 5213: 'c', 5733: 'd', 9319: 'e', 1127: 'f', 1649: 'g', 1137: 'h',
 	            1654: 'i', 3702: 'j', 9854: 'k', 1667: 'l', 1166: 'm', 1167: 'n', 9359: 'o', 1171: 'p', 1683: 'q',
 	            1175: 'r', 1178: 's', 1692: 't', 1695: 'u', 1184: 'v', 1698: 'w', 1190: 'x', 5802: 'y', 1204: 'z',
@@ -16,11 +16,18 @@ char_map = {1036: '0', 1038: '1', 8732: '2', 7215: '3', 2095: '4', 9270: '5', 46
 	            5037: '+', 1968: ',', 1461: '-', 1984: '.', 1986: '/', 6596: ':', 7110: ';', 3529: '<', 6097: '=',
 	            9690: '>', 7131: '?', 2527: '@', 2021: '[', 1510: '\\', 6632: ']', 1003: '^', 9707: '_', 1517: '`',
 	            1516: '{', 6129: '|', 1522: '}', 1523: '~'}
-address = "727825060538191585987860124234755079453535634763314230393770932"
-address = Crypt.decrypt(char_map=char_map, key=k, value=address)+"1"
-conn = sql.connect(server=address, user='mfg', password='mfg', database='MfgTraveler', login_timeout=10)
+_address = "727825060538191585987860124234755079453535634763314230393770932"
+_address = Crypt.decrypt(char_map=_char_map, key=_k, value=_address)+"1"
+conn = sql.connect(server=_address, user='mfg', password='mfg', database='MfgTraveler', login_timeout=10)
 
-def query(cmd):
+def query(cmd:str) -> tuple:
 	c = conn.cursor()
-	c.execute(cmd)
-	c.commit()
+	try: c.execute(cmd)
+	except: raise ConnectionError
+	else: return tuple(c.fetchall())
+
+def modify(cmd:str) -> None:
+	c = conn.cursor()
+	try: c.execute(cmd)
+	except: raise ConnectionError
+	else: conn.commit()
