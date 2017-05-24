@@ -3,12 +3,12 @@ __version__ = '2.0.0'
 
 import numpy as np
 
-def mode(ndarray):
+def mode(ndarray: np.ndarray):
 	if type(ndarray) is not np.ndarray: raise TypeError
 	value, count = np.unique(ndarray, return_counts=True)
 	return value[count.tolist().index(count.max())]
 
-def partial_derivative(ndarray):
+def partial_derivative(ndarray: np.ndarray):
 	if type(ndarray) is not np.ndarray: raise TypeError
 	if 2 > len(ndarray.shape) > 3: raise IndexError
 	if len(ndarray.shape) == 2:
@@ -29,7 +29,7 @@ def partial_derivative(ndarray):
 			retval[i] = np.rint(np.average(np.abs(np.subtract(c, temp))))
 	return retval
 
-def total_differential(ndarray, kernel_size=(3,3)):
+def total_differential(ndarray: np.ndarray, kernel_size=(3,3)):
 	if type(ndarray) is not np.ndarray: raise TypeError
 	if 1 >= len(ndarray.shape) > 3: raise IndexError
 	mod = int((kernel_size[0]-1)/2)
@@ -44,3 +44,11 @@ def total_differential(ndarray, kernel_size=(3,3)):
 			k = ndarray[y-mod:y+mod+1, x-mod:x+mod+1]
 			retval[y-mod, x-mod] = partial_derivative(k)
 	return retval
+
+def get_local_max(array: np.ndarray) -> tuple:
+	if len(array.shape) > 1: raise IndexError
+	return tuple([i for i in np.arange(1, array.shape[0]-1) if np.less(array[i-1], array[i]) and np.less(array[i+1], array[i])])
+
+def get_local_min(array: np.ndarray) -> tuple:
+	if len(array.shape) > 1: raise IndexError
+	return tuple([i for i in np.arange(1, array.shape[0]-1) if np.greater(array[i-1], array[i]) and np.greater(array[i+1], array[i])])
