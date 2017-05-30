@@ -1,6 +1,7 @@
 __author__ = 'jsh0x'
 __version__ = '2.0.0'
 
+from typing import Union, Tuple, NewType
 import numpy as np
 from PIL import Image
 
@@ -887,3 +888,7 @@ dev_array = np.array(([(15, 15, 15, 255), (31, 31, 31, 255), (46, 46, 46, 255), 
                       [(79, 79, 79, 255), (94, 94, 94, 255), (110, 110, 110, 255), (128, 128, 128, 255)],
                       [(143, 143, 143, 255), (158, 158, 158, 255), (173, 173, 173, 255), (191, 191, 191, 255)],
                       [(207, 207, 207, 255), (222, 222, 222, 255), (237, 237, 237, 255), (255, 255, 255, 255)]))
+
+Numeric = NewType('Numeric', Union[int, np.int8, np.int16, np.int32, np.int64,
+                                   np.uint8, np.uint16, np.uint32, np.uint64,
+								   float, np.float16, np.float32, np.float64])

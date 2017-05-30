@@ -3,30 +3,42 @@ __version__ = '2.0.0'
 
 import os
 import sys
+from threading import Thread
+from typing import Union, Tuple
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw
 from Convert import hex2rgb
-from Constants import CHARACTER_ARRAYS
+from Constants import CHARACTER_ARRAYS, Numeric
 from Zmath import total_differential as t_diff, get_local_max as local_max, get_local_min as local_min
 import datetime
 from matplotlib import pyplot as plt
 
 
 
-def show_image(array:np.ndarray, x: int = None, y: int = None, w: int = None, h: int = None, gray: bool = True):
+def show_image(image: np.ndarray, x: int = None, y: int = None, w: int = None, h: int = None, gray: bool = True):
 	if not x or not y or not w or not h:
 		if gray:
-			plt.imshow(array, cmap='gray')
+			plt.imshow(image, cmap='gray')
 		elif not gray:
-			im = Image.fromarray(array.astype(np.uint8))
+			im = Image.fromarray(image.astype(np.uint8))
 			im.show()
 	else:
 		if gray:
-			plt.imshow(array[y:y+h,x:x+w], cmap='gray')
+			plt.imshow(image[y:y+h,x:x+w], cmap='gray')
 		elif not gray:
-			plt.imshow(array[y:y + h, x:x + w])
+			plt.imshow(image[y:y + h, x:x + w])
 	plt.show()
+
+def reduce_image_whitespace(image: np.ndarray, threshold: int = 32, kernel: Tuple[int, int] = (5, 5)):
+	w = image.shape[1]
+	h = image.shape[0]
+	step = kernel[0]
+	k = np.floor_divide(step, 2)
+	slices = [(slice(y-k,y+k+1), slice(x-k,x+k+1)) for y in np.arange(k, h-k-1, step, dtype=np.intp) for x in np.arange(k, w-k-1, step, dtype=np.intp) if image[y-k:y+k+1,x-k:x+k+1].max() < threshold]
+	for y,x in slices:
+		image[y,x] = 0
+	return image
 
 def space_conflict(roi, roi_list):
 	retval = [roi2 for roi2 in roi_list if (np.abs(np.subtract(roi[0],roi2[0])) <= roi[2]-roi[0]) and (np.abs(np.subtract(roi[1],roi2[1])) <= roi[3]-roi[1])]
@@ -248,14 +260,16 @@ for i in range(10):
 print()
 print(time/10)"""
 im = Image.open('Q:/autopaper/Untitled2.png').convert('RGB')
-img, img2 = get_gradient(im), get_gradient(im.convert('L'))
-img3 = np.subtract(img, img2)
-if (img3.min() < 0) and ((img3.max() + np.absolute(img3.min())) <= 255):
-	img3 = np.asarray(np.rint(img3 + np.absolute(img3.min())), dtype=np.int8)
+#img, img2 = get_gradient(im), get_gradient(im.convert('L'))
+#img3 = np.subtract(img, img2)
+#if (img3.min() < 0) and ((img3.max() + np.absolute(img3.min())) <= 255):
+#	img3 = np.asarray(np.rint(img3 + np.absolute(img3.min())), dtype=np.int8)
 #print(len(set(img.flatten().tolist())), len(set(img2.flatten().tolist())))
 
 im2 = np.array(Image.open('Untitled2.png').convert('L'), dtype=np.int16)
 im2 = get_gradient(im)
+
+
 #print(im2.shape)
 #OCR("General", im2, 31)
 
@@ -405,9 +419,10 @@ for row,row2 in zip(im,im2):
 	print()
 print(np.mean(im), np.mean(im2))"""
 #a = dev("General", im2, 15)
-def dev2(input_string: str, haystack_image: np.ndarray, threshold: int):
+def dev2(input_string: str, haystack_image: np.ndarray, threshold: int, max_distance=5):
 	master_vals = {}
 	for i in np.arange(len(input_string)):
+		print(i)
 		char = input_string[i]
 		char_array = CHARACTER_ARRAYS[char]
 		h = np.floor_divide(char_array.shape[0], 2)
@@ -421,28 +436,82 @@ def dev2(input_string: str, haystack_image: np.ndarray, threshold: int):
 		lmxd = np.array(local_max(char_array[h - min_dim:h + min_dim, w - min_dim:w + min_dim][di]))
 		lmnd = np.array(local_min(char_array[h - min_dim:h + min_dim, w - min_dim:w + min_dim][di]))
 		master_vals[char] = []
-		for y in np.arange(h, haystack_image.shape[0] - h):
-			for x in np.arange(w, haystack_image.shape[1] - w):
-				array = haystack_image[y, x - w:x - w + char_array.shape[1]]
-				lmxh2 = np.array(local_max(array))
-				lmnh2 = np.array(local_min(array))
+		if i > 0:
+			prev_char = input_string[i-1]
+			prev_char_array = CHARACTER_ARRAYS[prev_char]
+			ph = np.floor_divide(prev_char_array.shape[0], 2)
+			pw = np.floor_divide(prev_char_array.shape[1], 2)
+			for x,y in master_vals[prev_char]:
+				roi = haystack_image[y-ph-h:y+ph+h,x+pw-1:x+pw+(3*w)]
+				show_image(roi)
+				for y in np.arange(h, roi.shape[0] - h):
+					for x in np.arange(w, roi.shape[1] - w):
+						array = roi[y, x - w:x - w + char_array.shape[1]]
+						lmxh2 = np.array(local_max(array))
+						lmnh2 = np.array(local_min(array))
+
+						if (lmxh2.shape[0] == lmxh.shape[0] and lmnh2.shape[0] == lmnh.shape[0]) and (np.less_equal(np.abs(np.sum(np.subtract(lmxh2, lmxh))), lmxh.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnh2, lmnh))), lmnh.shape[0])):
+							array = roi[y - h:y - h + char_array.shape[0], x]
+							lmxv2 = np.array(local_max(array))
+							lmnv2 = np.array(local_min(array))
+
+							if (lmxv2.shape[0] == lmxv.shape[0] and lmnv2.shape[0] == lmnv.shape[0]) and (np.less_equal(np.abs(np.sum(np.subtract(lmxv2, lmxv))), lmxv.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnv2, lmnv))), lmnv.shape[0])):
+								array = roi[y - min_dim:y - min_dim + char_array.shape[0], x - min_dim:x - min_dim + char_array.shape[1]][di]
+								lmxd2 = np.array(local_max(array))
+								lmnd2 = np.array(local_min(array))
+
+								if (lmxd2.shape[0] == lmxd.shape[0] and lmnd2.shape[0] == lmnd.shape[0]) and (np.less_equal(np.abs(np.sum(np.subtract(lmxd2, lmxd))), lmxd.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnd2, lmnd))), lmnd.shape[0])):
+									array = roi[y - h:y - h + char_array.shape[0], x - w:x - w + char_array.shape[1]]
+									if np.less(np.mean(np.abs(np.subtract(array, char_array))), threshold):
+										master_vals[char].append((x, y))
+		else:
+			for y in np.arange(h, haystack_image.shape[0] - h):
+				for x in np.arange(w, haystack_image.shape[1] - w):
+					array = haystack_image[y, x - w:x - w + char_array.shape[1]]
+					lmxh2 = np.array(local_max(array))
+					lmnh2 = np.array(local_min(array))
 				
-				if (lmxh2.shape[0] == lmxh.shape[0] and lmnh2.shape[0] == lmnh.shape[0]) and (np.less_equal(np.abs(np.sum(np.subtract(lmxh2, lmxh))), lmxh.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnh2, lmnh))), lmnh.shape[0])):
-					array = haystack_image[y - h:y - h + char_array.shape[0], x]
-					lmxv2 = np.array(local_max(array))
-					lmnv2 = np.array(local_min(array))
+					if (lmxh2.shape[0] == lmxh.shape[0] and lmnh2.shape[0] == lmnh.shape[0]) and (np.less_equal(np.abs(np.sum(np.subtract(lmxh2, lmxh))), lmxh.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnh2, lmnh))), lmnh.shape[0])):
+						array = haystack_image[y - h:y - h + char_array.shape[0], x]
+						lmxv2 = np.array(local_max(array))
+						lmnv2 = np.array(local_min(array))
 
-					if (lmxv2.shape[0] == lmxv.shape[0] and lmnv2.shape[0] == lmnv.shape[0]) and (np.less_equal(np.abs(np.sum(np.subtract(lmxv2, lmxv))), lmxv.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnv2, lmnv))), lmnv.shape[0])):
-						array = haystack_image[y - min_dim:y - min_dim + char_array.shape[0], x - min_dim:x - min_dim + char_array.shape[1]][di]
-						lmxd2 = np.array(local_max(array))
-						lmnd2 = np.array(local_min(array))
+						if (lmxv2.shape[0] == lmxv.shape[0] and lmnv2.shape[0] == lmnv.shape[0]) and (np.less_equal(np.abs(np.sum(np.subtract(lmxv2, lmxv))), lmxv.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnv2, lmnv))), lmnv.shape[0])):
+							array = haystack_image[y - min_dim:y - min_dim + char_array.shape[0], x - min_dim:x - min_dim + char_array.shape[1]][di]
+							lmxd2 = np.array(local_max(array))
+							lmnd2 = np.array(local_min(array))
 
-						if (lmxd2.shape[0] == lmxd.shape[0] and lmnd2.shape[0] == lmnd.shape[0]) and (np.less_equal(np.abs(np.sum(np.subtract(lmxd2, lmxd))), lmxd.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnd2, lmnd))), lmnd.shape[0])):
-							array = haystack_image[y - h:y - h + char_array.shape[0], x - w:x - w + char_array.shape[1]]
-							if np.less(np.mean(np.abs(np.subtract(array, char_array))), threshold):
-								master_vals[char].append((x, y))
+							if (lmxd2.shape[0] == lmxd.shape[0] and lmnd2.shape[0] == lmnd.shape[0]) and (np.less_equal(np.abs(np.sum(np.subtract(lmxd2, lmxd))), lmxd.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnd2, lmnd))), lmnd.shape[0])):
+								array = haystack_image[y - h:y - h + char_array.shape[0], x - w:x - w + char_array.shape[1]]
+								if np.less(np.mean(np.abs(np.subtract(array, char_array))), threshold):
+									master_vals[char].append((x, y))
 	return master_vals
-retval = dev2("Ge", im2, 20)
+	master_vals2 = {}
+	for i in range(len(master_vals.keys())-1):
+		k1 = list(master_vals.keys())[i]
+		k2 = list(master_vals.keys())[i+1]
+		for x1,y1 in master_vals[k1]:
+			char_array1 = CHARACTER_ARRAYS[k1]
+			w1 = np.floor_divide(char_array1.shape[1], 2)
+			h1 = np.floor_divide(char_array1.shape[0], 2)
+			for x2,y2 in sorted(master_vals[k2]):
+				char_array2 = CHARACTER_ARRAYS[k2]
+				w2 = np.floor_divide(char_array2.shape[1], 2)
+				h2 = np.floor_divide(char_array2.shape[0], 2)
+				x_dist = np.subtract(x2-w2, x1-w1+char_array1.shape[1])
+				y_dist = np.subtract(y2, y1)
+				print(x1, y1)
+				print(x2, y2)
+				print(x_dist, y_dist, np.hypot(x_dist, y_dist))
+				print()
+				if np.hypot(x_dist, y_dist) <= max_distance:
+					pass
+
+	return master_vals
+retval = dev2("Gen", im2, 30)
+for k,v in retval.items():
+	print(k,v)
+quit()
 im2 = np.stack((im2, im2, im2), axis=2)
 for k,v in retval.items():
 	char_array = CHARACTER_ARRAYS[k]
