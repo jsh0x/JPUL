@@ -3,7 +3,7 @@ __version__ = '3.0.0'
 
 
 import numpy as np
-from Constants import FORM_LIST
+from constants import FORM_LIST
 
 
 #Initial Variables

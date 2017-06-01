@@ -1,8 +1,8 @@
 __author__ = 'jsh0x'
 __version__ = '2.0.0'
 
-import pymssql as sql
-import Crypt
+import pymssql
+import crypt
 
 _k = 462758
 _char_map = {1036: '0', 1038: '1', 8732: '2', 7215: '3', 2095: '4', 9270: '5', 4668: '6', 2109: '7', 2116: '8',
@@ -17,8 +17,8 @@ _char_map = {1036: '0', 1038: '1', 8732: '2', 7215: '3', 2095: '4', 9270: '5', 4
 	            9690: '>', 7131: '?', 2527: '@', 2021: '[', 1510: '\\', 6632: ']', 1003: '^', 9707: '_', 1517: '`',
 	            1516: '{', 6129: '|', 1522: '}', 1523: '~'}
 _address = "727825060538191585987860124234755079453535634763314230393770932"
-_address = Crypt.decrypt(char_map=_char_map, key=_k, value=_address)+"1"
-conn = sql.connect(server=_address, user='mfg', password='mfg', database='MfgTraveler', login_timeout=10)
+_address = crypt.decrypt(char_map=_char_map, key=_k, value=_address)+"1"
+conn = pymssql.connect(server=_address, user='mfg', password='mfg', database='MfgTraveler', login_timeout=10)
 
 def query(cmd:str) -> tuple:
 	c = conn.cursor()

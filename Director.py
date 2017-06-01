@@ -4,7 +4,7 @@ __version__ = '1.0.0'
 import datetime
 from threading import Thread
 import numpy as np
-import Worker as worker, SyteLine as sl, SQL as sql
+import worker, sql, SyteLine as sl
 
 number_of_workers = 4
 current_workers = np.empty((number_of_workers,), dtype=object)

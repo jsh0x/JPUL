@@ -5,8 +5,8 @@ import os, sys, logging, datetime
 import cv2
 import pyperclip
 import numpy as np
-#from JPUL import (SyteLine as sl, SQL as sql)
-#from JPUL.Image import OCR
+#from JPUL import (SyteLine as sl, sql)
+#from JPUL.image import OCR
 
 class Unit:
 	def __init__(self, serial_number:str, build:int, carrier:str, product:str, suffix:str):

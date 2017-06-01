@@ -3,14 +3,15 @@ __version__ = '2.0.0'
 
 import os
 import sys
+from queue import Queue
 from threading import Thread
 from typing import Union, Tuple
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw
-from Convert import hex2rgb
-from Constants import CHARACTER_ARRAYS, Numeric
-from Zmath import total_differential as t_diff, get_local_max as local_max, get_local_min as local_min
+from convert import hex2rgb
+from constants import CHARACTER_ARRAYS, Numeric
+from zmath import total_differential as t_diff, get_local_max as local_max, get_local_min as local_min
 import datetime
 from matplotlib import pyplot as plt
 
@@ -45,7 +46,7 @@ def space_conflict(roi, roi_list):
 	if len(retval) <= 1: return None
 	else: return retval
 
-def get_gradient(image) -> np.ndarray:
+def get_gradient(image: Union[str, np.ndarray, Image.Image]) -> np.ndarray:
 	"""finds the anti-derivative of an image's RGB values"""
 	if type(image) is str and not os.path.exists(image): raise FileNotFoundError(f"Image directory '{image}' not found")
 	elif type(image) is str: img = np.array(Image.open(image).convert('RGB'), dtype=np.int16)
@@ -281,6 +282,31 @@ im2 = get_gradient(im)
 # COLOR= 108.622931 seconds
 # GRAY=  39.256156 seconds
 
+def temp_thread(chunk, xy, h, w, min_dim, lmxh, lmnh, lmxv, lmnv, lmxd, lmnd, threshold, char_array, q):
+	for y in np.arange(h, chunk.shape[0] - h):
+		for x in np.arange(w, chunk.shape[1] - w):
+			array = chunk[y, x - w:x - w + char_array.shape[1]]
+			lmxh2 = np.array(local_max(array,legacy=True))
+			lmnh2 = np.array(local_min(array,legacy=True))
+			#TODO: HERE TOO
+			if (lmxh2[0].shape[0] == lmxh.shape[0] and lmnh2[0].shape[0] == lmnh.shape[0]) and (
+				np.less_equal(np.abs(np.sum(np.subtract(lmxh2[0], lmxh))), lmxh.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnh2[0], lmnh))), lmnh.shape[0])):
+				array = chunk[y - h:y - h + char_array.shape[0], x]
+				lmxv2 = np.array(local_max(array,legacy=True))
+				lmnv2 = np.array(local_min(array,legacy=True))
+
+				if (lmxv2[0].shape[0] == lmxv.shape[0] and lmnv2[0].shape[0] == lmnv.shape[0]) and (
+					np.less_equal(np.abs(np.sum(np.subtract(lmxv2[0], lmxv))), lmxv.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnv2[0], lmnv))), lmnv.shape[0])):
+					array = chunk[y - min_dim:y - min_dim + char_array.shape[0], x - min_dim:x - min_dim + char_array.shape[1]][di]
+					lmxd2 = np.array(local_max(array,legacy=True))
+					lmnd2 = np.array(local_min(array,legacy=True))
+
+					if (lmxd2[0].shape[0] == lmxd.shape[0] and lmnd2[0].shape[0] == lmnd.shape[0]) and (
+						np.less_equal(np.abs(np.sum(np.subtract(lmxd2[0], lmxd))), lmxd.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnd2[0], lmnd))), lmnd.shape[0])):
+						array = chunk[y - h:y - h + char_array.shape[0], x - w:x - w + char_array.shape[1]]
+						if np.less(np.mean(np.abs(np.subtract(array, char_array))), threshold):
+							q.put((x, y))
+
 def dev(input_string: str, haystack_image, threshold=0.8, roi=None, bold=False):
 	string_width = 0
 	string_height = 8
@@ -420,9 +446,9 @@ for row,row2 in zip(im,im2):
 print(np.mean(im), np.mean(im2))"""
 #a = dev("General", im2, 15)
 def dev2(input_string: str, haystack_image: np.ndarray, threshold: int, max_distance=5):
+	retval = {}
 	master_vals = {}
 	for i in np.arange(len(input_string)):
-		print(i)
 		char = input_string[i]
 		char_array = CHARACTER_ARRAYS[char]
 		h = np.floor_divide(char_array.shape[0], 2)
@@ -435,7 +461,6 @@ def dev2(input_string: str, haystack_image: np.ndarray, threshold: int, max_dist
 		lmnv = np.array(local_min(char_array[:, w]))
 		lmxd = np.array(local_max(char_array[h - min_dim:h + min_dim, w - min_dim:w + min_dim][di]))
 		lmnd = np.array(local_min(char_array[h - min_dim:h + min_dim, w - min_dim:w + min_dim][di]))
-		master_vals[char] = []
 		if i > 0:
 			prev_char = input_string[i-1]
 			prev_char_array = CHARACTER_ARRAYS[prev_char]
@@ -465,6 +490,23 @@ def dev2(input_string: str, haystack_image: np.ndarray, threshold: int, max_dist
 									if np.less(np.mean(np.abs(np.subtract(array, char_array))), threshold):
 										master_vals[char].append((x, y))
 		else:
+			step_x = np.floor_divide(haystack_image.shape[1], 6)
+			step_y = np.floor_divide(haystack_image.shape[0], 6)
+			q = Queue()
+			for i in np.arange(0, haystack_image.shape[0], step_y):
+				for j in np.arange(0, haystack_image.shape[1], step_x):
+					section = haystack_image[i:i+step_y, j:j+step_x].view()
+					if section.shape[0] > char_array.shape[0] and section.shape[1] > char_array.shape[1]:
+						worker = Thread(target=temp_thread, args=(section,(i,j), h, w, min_dim, lmxh, lmnh, lmxv, lmnv, lmxd, lmnd, threshold, char_array, q))
+						worker.setDaemon(True)
+						worker.start()
+			worker.join()
+			while not q.empty():
+				print(q.get())
+
+
+			#TODO: HERE
+			quit()
 			for y in np.arange(h, haystack_image.shape[0] - h):
 				for x in np.arange(w, haystack_image.shape[1] - w):
 					array = haystack_image[y, x - w:x - w + char_array.shape[1]]
