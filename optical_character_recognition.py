@@ -2,17 +2,16 @@ __author__ = 'jsh0x'
 __version__ = '3.0.0'
 
 import sqlite3 as sql
-from typing import Union, Dict
+from typing import Union, Dict, Tuple
 import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image
-from zmath import get_local_max as local_max, get_local_min as local_min
+from zmath import get_local_max as local_max, get_local_min as local_min, diff
 from image import get_gradient, get_diagonals, show_image
 from constants import CHARACTERS, STANDARD_COLORS
 
 
 #Global Variables
-
 DIRECTIONS = ('horizontal', 'vertical', 'diagonal_negative', 'diagonal_positive')
 """conn = sql.connect('character_info.db')
 c = conn.cursor()
@@ -22,6 +21,59 @@ c.execute('CREATE TABLE character_arrays (char, image_array, direction, local_ma
 c.execute('CREATE TABLE character_shapes (char, shape)')
 conn.commit()
 conn.close()"""
+
+
+
+def markup_plot(ax: plt.axis(), mark_local=True, mark_global=True):
+	line = ax.lines[0]
+	x_data,y_data = line.get_xdata(),line.get_ydata()
+	lmn = local_min(y_data)
+	lmx = local_max(y_data)
+	ymin, ymax = plt.ylim()
+
+	if mark_global:
+		mx = max(y_data)
+		mn = min(y_data)
+		lmxi = [x_data[i] for i in np.arange(y_data.shape[0]) if y_data[i] == mx]
+		for i in lmxi:
+			if np.asarray(mx, dtype=np.int32)+50 >= ymax:
+				ax.plot(i, mx-50, '^k')
+				if not mark_local:
+					ax.plot(i, mx-25, '^k')
+			else:
+				ax.plot(i, mx+50, '^k')
+				if not mark_local:
+					ax.plot(i, mx+25, '^k')
+		lmni = [x_data[i] for i in np.arange(y_data.shape[0]) if y_data[i] == mn]
+		print(y_data, mx, mn, lmxi, lmni)
+		for i in lmni:
+			if np.asarray(mn, dtype=np.int32)-50 <= ymin:
+				ax.plot(i, mn+50, 'vk')
+				if not mark_local:
+					ax.plot(i, mn+25, 'vk')
+			else:
+				ax.plot(i, mn-50, 'vk')
+				if not mark_local:
+					ax.plot(i, mn-25, 'vk')
+
+	elif mark_local:
+		lmni = [x_data[i] for i in np.arange(lmn[0].shape[0]) if lmn[0][i] == 1]
+		lmxi = [x_data[i] for i in np.arange(lmx[0].shape[0]) if lmx[0][i] == 1]
+
+		for i, mx in zip(lmxi, lmx[1]):
+			if np.asarray(mx, dtype=np.int32)+25 >= ymax:
+				ax.plot(i, mx-25, '^k')
+			else:
+				ax.plot(i, mx+25, '^k')
+		for i, mn in zip(lmni, lmn[1]):
+			if np.asarray(mn, dtype=np.int32)-25 <= ymin:
+				ax.plot(i, mn+25, 'vk')
+			else:
+				ax.plot(i, mn-25, 'vk')
+	#quit()
+
+
+
 
 def remember(char: str=None) -> dict:
 	if not char:
@@ -90,8 +142,8 @@ def teach(char: str, image: np.ndarray):
 		temp[direction] = (lmx, lmn, lmx2, lmn2)
 	return temp
 #char, image_array, direction, local_max, local_min, local_max2, local_min2, global_max, global_min
-def display_peaks_and_valleys(ao: np.ndarray, a_dict: Dict):
-	disp_val = np.empty((list(a_dict.values())[0][0].shape[0], list(a_dict.values())[0][0].shape[1], 3), dtype=np.int16)
+def display_peaks_and_valleys(a: np.ndarray):
+	"""disp_val = np.empty((list(a_dict.values())[0][0].shape[0], list(a_dict.values())[0][0].shape[1], 3), dtype=np.int16)
 	disp_val[...,0] = ao
 	disp_val[...,1] = ao
 	disp_val[...,2] = ao
@@ -196,8 +248,72 @@ def display_peaks_and_valleys(ao: np.ndarray, a_dict: Dict):
 						line[i,2] = line[i,2]-32
 	im = Image.fromarray(a).convert('RGB')
 	plt.imshow(im)
-	plt.show()
+	plt.show()"""
 
+	f, (ax1, ax2, ax3, ax4) = plt.subplots(4, sharex=True, sharey=True)
+	ax1.set_title('Sharing both axes')
+	# Fine-tune figure; make subplots close to each other and hide x ticks for
+	# all but bottom plot.
+
+
+	cx = np.floor_divide(a.shape[1], 2)
+	cy = np.floor_divide(a.shape[0], 2)
+	min_dim = min(a.shape[0], a.shape[1])
+	di = np.diag_indices(min_dim)
+	b = np.fliplr(a.copy())
+
+	ax1.plot(np.arange(a.shape[1]), a[cy,:], 'r-')
+	markup_plot(ax1)
+
+	ax2.plot(np.arange(a.shape[0]), a[:,cx], 'g-')
+	markup_plot(ax2)
+
+	ax3.plot(np.arange(min_dim), a[di], 'b-')
+	markup_plot(ax3)
+
+	ax4.plot(np.arange(min_dim), b[di], 'c-')
+	markup_plot(ax4)
+
+	temp = np.asarray(a[cy,:], dtype=np.int32)
+	temp = np.abs(np.subtract(temp[:-1], temp[1:]))
+	ax1.plot(np.arange(1, a.shape[1]), temp, 'r--')
+
+	temp = np.asarray(a[:,cx], dtype=np.int32)
+	temp = np.abs(np.subtract(temp[:-1], temp[1:]))
+	ax2.plot(np.arange(1, a.shape[0]), temp, 'g--')
+
+	temp = np.asarray(a[di], dtype=np.int32)
+	temp = np.abs(np.subtract(temp[:-1], temp[1:]))
+	ax3.plot(np.arange(1, min_dim), temp, 'b--')
+
+	temp = np.asarray(b[di], dtype=np.int32)
+	temp = np.abs(np.subtract(temp[:-1], temp[1:]))
+	ax4.plot(np.arange(1, min_dim), temp, 'c--')
+	f.subplots_adjust(hspace=0)
+	plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
+	#ax1.tick_params(axis='y', left='off', labelleft='off')
+	#ax2.tick_params(axis='y', left='off', labelleft='off')
+	#ax3.tick_params(axis='y', left='off', labelleft='off')
+	#ax4.tick_params(axis='y', left='off', labelleft='off')
+	#plt.minorticks_on()
+	"""h_array = np.zeros_like(a[1:], dtype=np.int16)
+	for i in np.arange(h_array.shape[0]):
+		rows = np.asarray(a[i:i+2,:], dtype=np.int32)
+		val = np.abs(np.subtract(rows[0],rows[1]))
+		h_array[i] = val
+	y_vals = (h_array.mean(axis=1)).round(1)
+	x_vals = np.arange(h_array.shape[0])
+	plt.plot(x_vals, y_vals, 'r-')"""
+
+	"""v_array = np.zeros_like(a[:,1:], dtype=np.int16)
+	for i in np.arange(v_array.shape[1]):
+		cols = np.asarray(a[:,i:i+2], dtype=np.int32)
+		val = np.abs(np.subtract(cols[:,0], cols[:,1]))
+		v_array[:,i] = val
+	y_vals = (v_array.mean(axis=1)).round(1)
+	x_vals = np.arange(v_array.shape[0])
+	plt.plot(x_vals, y_vals, 'g-')"""
+	plt.show()
 	#show_image(disp_val[...,::-1], gray=False)
 #def test():
 #	pass
@@ -211,11 +327,11 @@ G2 = teach('G', G2im)
 G3 = teach('G', G3im)
 G4 = teach('G', G4im)
 G5 = teach('G', G5im)
-display_peaks_and_valleys(G1im, G1)
-display_peaks_and_valleys(G1im, G2)
-display_peaks_and_valleys(G1im, G3)
-display_peaks_and_valleys(G1im, G4)
-display_peaks_and_valleys(G1im, G5)
+display_peaks_and_valleys(G1im)
+display_peaks_and_valleys(G1im)
+display_peaks_and_valleys(G1im)
+display_peaks_and_valleys(G1im)
+display_peaks_and_valleys(G1im)
 
 
 def dev2(input_string: str, haystack_image: np.ndarray, threshold: int, max_distance=5):
