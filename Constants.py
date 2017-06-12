@@ -1,12 +1,15 @@
 __author__ = 'jsh0x'
 __version__ = '2.0.0'
 
+from string import digits,ascii_letters,punctuation
 from typing import Union, Tuple, NewType
 import numpy as np
 from PIL import Image
 
 
 FORM_LIST = ()
+
+CHARACTERS = digits+ascii_letters+punctuation
 
 CHARACTER_ARRAYS = {'a': np.array(((14, 38, 62, 72, 57, 33, 9),
 								   (14, 107, 153, 140, 136, 73, 28),
@@ -892,3 +895,8 @@ dev_array = np.array(([(15, 15, 15, 255), (31, 31, 31, 255), (46, 46, 46, 255), 
 Numeric = NewType('Numeric', Union[int, np.int8, np.int16, np.int32, np.int64,
                                    np.uint8, np.uint16, np.uint32, np.uint64,
 								   float, np.float16, np.float32, np.float64])
+
+#for v in CHARACTER_ARRAYS.values():
+#	print(v.shape)
+STANDARD_COLORS = {'Red': (255, 0, 0), 'Orange': (255, 128, 0), 'Yellow': (255, 255, 0), 'Green': (0, 255, 0),
+				   'Blue': (0, 0, 255), 'Cyan': (0, 255, 255), 'Purple': (128, 0, 255), 'Magenta': (255, 0, 255)}

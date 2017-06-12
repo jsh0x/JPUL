@@ -2,16 +2,18 @@ __author__ = 'jsh0x'
 __version__ = '3.0.0'
 
 import sqlite3 as sql
-from typing import Union
-from string import digits,ascii_letters,punctuation
+from typing import Union, Dict
 import numpy as np
+from matplotlib import pyplot as plt
+from PIL import Image
 from zmath import get_local_max as local_max, get_local_min as local_min
-#from image import get_gradient
+from image import get_gradient, get_diagonals, show_image
+from constants import CHARACTERS, STANDARD_COLORS
 
 
 #Global Variables
-CHARACTERS = digits+ascii_letters+punctuation
-DIRECTIONS = ('horizontal', 'vertical', 'diagonal')
+
+DIRECTIONS = ('horizontal', 'vertical', 'diagonal_negative', 'diagonal_positive')
 """conn = sql.connect('character_info.db')
 c = conn.cursor()
 c.execute('DROP TABLE character_arrays')
@@ -20,35 +22,39 @@ c.execute('CREATE TABLE character_arrays (char, image_array, direction, local_ma
 c.execute('CREATE TABLE character_shapes (char, shape)')
 conn.commit()
 conn.close()"""
-quit()
 
-def remember() -> dict:
-	retdict = {}
-	for char in CHARACTERS:
-		retdict[char] = {'shape': None, 'local_maxes': None, 'local_mins': None}
-		conn = sql.connect('character_info.db')
-		c = conn.cursor()
-		c.execute(f"SELECT image_array,local_maxes,local_mins FROM character_arrays WHERE char = '{char}'")
-		sample_list = tuple(c.fetchall())
-		conn.close()
+def remember(char: str=None) -> dict:
+	if not char:
+		retdict = {}
+		for char in CHARACTERS:
+			retdict[char] = {'shape': None, 'local_maxes': None, 'local_mins': None}
+			conn = sql.connect('character_info.db')
+			c = conn.cursor()
+			c.execute(f"SELECT image_array,local_maxes,local_mins FROM character_arrays WHERE char = '{char}'")
+			sample_list = tuple(c.fetchall())
+			conn.close()
 
-		image_array = np.zeros_like(sample_list[0][0], dtype=np.int32)
-		local_max_array = np.zeros_like(sample_list[0][0], dtype=np.int32)
-		for i,(array,lmx,lmn) in enumerate(sample_list):
-			full_array += np.array(sample)
-			pass
-	return retval
+			image_array = np.zeros_like(sample_list[0][0], dtype=np.int32)
+			local_max_array = np.zeros_like(sample_list[0][0], dtype=np.int32)
+			local_min_array = np.zeros_like(sample_list[0][0], dtype=np.int32)
+			local_max_array = np.zeros_like(sample_list[0][0], dtype=np.int32)
+			for i,(array,lmx,lmn) in enumerate(sample_list):
+				#full_array += np.array(sample)
+				pass
+		#return retval
 
 
 def teach(char: str, image: np.ndarray):
+	temp = {}
 	if type(char) is not str: raise TypeError
 	if len(char) > 1: raise ValueError
 	conn = sql.connect('character_info.db')
 	c = conn.cursor()
 	c.execute(f"SELECT shape FROM character_shapes WHERE char = '{char}'")
-	shape = tuple(c.fetchone())
+	#shape = tuple(c.fetchone())
+	shape = (9,9)
 	conn.close()
-	if image.shape != shape: raise IndexError
+	if image.shape != shape: raise IndexError(f'{image.shape} != {shape}')
 	tmp = np.zeros_like(image, dtype=np.int32)
 	gmx = np.where(np.equal(image, np.max(image.flatten())), 1, 0)
 	gmn = np.where(np.equal(image, np.min(image.flatten())), 1, 0)
@@ -71,23 +77,145 @@ def teach(char: str, image: np.ndarray):
 				lmn[i] = local_min(column)[0]
 				lmx2[i] = np.where(np.equal(column, np.max(column)), 1, 0)
 				lmn2[i] = np.where(np.equal(column, np.min(column)), 1, 0)
-		elif direction == 'diagonal':
-			for i in np.arange(image.shape[1], dtype=np.intp):
-				column = image[:,i]
-				lmx[i] = local_max(column)[0]
-				lmn[i] = local_min(column)[0]
-				lmx2[i] = np.where(np.equal(column, np.max(column)), 1, 0)
-				lmn2[i] = np.where(np.equal(column, np.min(column)), 1, 0)
+		elif direction == 'diagonal_negative':
+			lmx,lmn, lmx2, lmn2 = get_diagonals(image)
+		elif direction == 'diagonal_positive':
+			lmx, lmn, lmx2, lmn2 = get_diagonals(image, flipped=True)
 
 		conn = sql.connect('character_info.db')
 		c = conn.cursor()
-		c.execute(f"INSERT INTO character_arrays VALUES ('{char}', {image}, '{direction}', {lmx}, {lmn}, {lmx2}, {lmn2}, {gmx}, {gmn})")
-		conn.commit()
+		#c.execute(f"INSERT INTO character_arrays VALUES ('{char}', {image}, '{direction}', {lmx}, {lmn}, {lmx2}, {lmn2}, {gmx}, {gmn})")
+		#conn.commit()
 		conn.close()
+		temp[direction] = (lmx, lmn, lmx2, lmn2)
+	return temp
 #char, image_array, direction, local_max, local_min, local_max2, local_min2, global_max, global_min
+def display_peaks_and_valleys(ao: np.ndarray, a_dict: Dict):
+	disp_val = np.empty((list(a_dict.values())[0][0].shape[0], list(a_dict.values())[0][0].shape[1], 3), dtype=np.int16)
+	disp_val[...,0] = ao
+	disp_val[...,1] = ao
+	disp_val[...,2] = ao
+	for k,v in a_dict.items():
+		v2, v3, v4, v5 = v
+		temp = [(x,y) for (x,y),val in np.ndenumerate(v2) if val==1]
+		for x,y in temp:
+			if 'horizontal' in k:
+				disp_val[y,x] = (255, 0, 0)
+				#disp_val[...,0] = np.where(v3 == 1, 64, disp_val[...,0])
+			elif 'vertical' in k:
+				disp_val[y, x] = (0, 255, 0)
+				#disp_val[...,1] = np.where(v3 == 1, 64, disp_val[...,1])
+			elif 'diagonal_negative' in k:
+				disp_val[y, x] = (0, 0, 255)
+				#disp_val[...,2] = np.where(v3 == 1, 64, disp_val[...,2])
+			elif 'diagonal_positive' in k:
+				disp_val[y, x] = (255, 255, 0)
+	im = Image.fromarray(np.asarray(disp_val[..., ::-1], dtype=np.uint8)).convert('RGB')
+	a = np.array(im)
+	for y in np.arange(a.shape[0]):
+		for x in np.arange(a.shape[1]):
+			direction = None
+			if a[y,x,0] == 255 and a[y,x,1] == 0 and a[y,x,2] == 0:
+				line = a[y,:].view()
+				direction = 'horizontal'
+			elif a[y,x,0] == 0 and a[y,x,1] == 255 and a[y,x,2] == 0:
+				line = a[:,x].view()
+				direction = 'vertical'
+			elif a[y,x,0] == 0 and a[y,x,1] == 0 and a[y,x,2] == 255:
+				temp_x = x
+				temp_y = y
+				while temp_x > 0 and temp_y > 0:
+					temp_x -= 1
+					temp_y -= 1
+				min_x = temp_x
+				min_y = temp_y
 
+				temp_x = x
+				temp_y = y
+				while temp_x < a.shape[1] and temp_y < a.shape[0]:
+					temp_x += 1
+					temp_y += 1
+				max_x = temp_x
+				max_y = temp_y
+				x_range = np.arange(min_x, max_x)
+				y_range = np.arange(min_y, max_y)
+				xy = (y_range, x_range)
+				line = a[xy].view()
+				direction = 'diagonal_negative'
+			elif a[y,x,0] == 255 and a[y,x,1] == 255 and a[y,x,2] == 0:
+				temp_x = x
+				temp_y = y
+				while temp_x > 0 and temp_y < a.shape[0]:
+					temp_x -= 1
+					temp_y -= 1
+				min_x = temp_x
+				max_y = temp_y
+
+				temp_x = x
+				temp_y = y
+				while temp_x < a.shape[1] and temp_y > 0:
+					temp_x += 1
+					temp_y += 1
+				max_x = temp_x
+				min_y = temp_y
+				x_range = np.arange(min_x, max_x)
+				y_range = np.arange(min_y, max_y)
+				xy = (y_range, x_range)
+				line = a[xy].view()
+				direction = 'diagonal_positive'
+			else:
+				continue
+			for i in np.arange(line.shape[0]):
+				if direction == 'horizontal':
+					if line[i,0] < 200:
+						line[i,0] = line[i,0]+32
+					if line[i,1] >= 32:
+						line[i,1] = line[i,1]-32
+					if line[i,2] >= 32:
+						line[i,2] = line[i,2]-32
+				elif direction == 'vertical':
+					if line[i,0] >= 32:
+						line[i,0] = line[i,0]-32
+					if line[i,1] < 200:
+						line[i,1] = line[i,1]+32
+					if line[i,2] >= 32:
+						line[i,2] = line[i,2]-32
+				elif direction == 'diagonal_negative':
+					if line[i,0] >= 32:
+						line[i,0] = line[i,0]-32
+					if line[i,1] >= 32:
+						line[i,1] = line[i,1]-32
+					if line[i,2] < 200:
+						line[i,2] = line[i,2]+32
+				elif direction == 'diagonal_positive':
+					if line[i,0] < 200:
+						line[i,0] = line[i,0]+32
+					if line[i,1] < 200:
+						line[i,1] = line[i,1]+32
+					if line[i,2] >= 32:
+						line[i,2] = line[i,2]-32
+	im = Image.fromarray(a).convert('RGB')
+	plt.imshow(im)
+	plt.show()
+
+	#show_image(disp_val[...,::-1], gray=False)
 #def test():
 #	pass
+G1im = np.array(Image.open('G1.png').convert('L'))
+G2im = np.array(Image.open('G2.png').convert('L'))
+G3im = np.array(Image.open('G3.png').convert('L'))
+G4im = np.array(Image.open('G4.png').convert('L'))
+G5im = np.array(Image.open('G5.png').convert('L'))
+G1 = teach('G', G1im)
+G2 = teach('G', G2im)
+G3 = teach('G', G3im)
+G4 = teach('G', G4im)
+G5 = teach('G', G5im)
+display_peaks_and_valleys(G1im, G1)
+display_peaks_and_valleys(G1im, G2)
+display_peaks_and_valleys(G1im, G3)
+display_peaks_and_valleys(G1im, G4)
+display_peaks_and_valleys(G1im, G5)
 
 
 def dev2(input_string: str, haystack_image: np.ndarray, threshold: int, max_distance=5):

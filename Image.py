@@ -17,6 +17,16 @@ from matplotlib import pyplot as plt
 
 
 
+"""def kernel(image: np.ndarray, f: function, k: Tuple[int, int]=(3,3)) -> np.ndarray:
+	border_x = np.floor_divide(k[0],2)
+	border_y = np.floor_divide(k[1],2)
+	retval = np.empty((np.subtract(image.shape[0],np.multiply(border_y, 2)), np.subtract(image.shape[1]-np.multiply(border_x, 2))))
+	for y in np.arange(border_y, np.subtract(image.shape[0], border_y)):
+		for x in np.arange(border_x, np.subtract(image.shape[1], border_x)):
+			val = image[np.subtract(y,border_y):np.add(np.subtract(y,border_y),k[1]), np.subtract(x,border_x):np.add(np.subtract(x,border_x),k[0])].copy()
+			retval[np.subtract(y,border_y), np.subtract(x,border_x)] = f(val)
+	return retval"""
+
 def show_image(image: np.ndarray, x: int = None, y: int = None, w: int = None, h: int = None, gray: bool = True):
 	if not x or not y or not w or not h:
 		if gray:
@@ -239,37 +249,75 @@ def OCR(input_string, haystack_image, tolerance_threshold=10, roi=None):
 			draw.rectangle((x1, y1, x2, y2), outline=color)
 	im.show()
 
+def get_diagonals(a: np.ndarray, flipped=False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+	tmp = np.zeros_like(a, dtype=np.int32)
+	lmx = tmp.copy()
+	lmn = tmp.copy()
+	lmx2 = tmp.copy()
+	lmn2 = tmp.copy()
+	if flipped:
+		a = np.fliplr(a)
+	if a.shape[0] < a.shape[1]:
+		for i in np.arange(a.shape[0] - 3, 0, -1, dtype=np.intp):
+			diagonal = np.diagonal(a[i:, :a.shape[0] - i])
+			di = np.diag_indices(a[i:, :a.shape[0] - i].shape[0])
+			lmx[i:, :a.shape[0] - i][di] = local_max(diagonal)[0]
+			lmn[i:, :a.shape[0] - i][di] = local_min(diagonal)[0]
+			lmx2[i:, :a.shape[0] - i][di] = np.where(np.equal(diagonal, np.max(diagonal)), 1, 0)
+			lmn2[i:, :a.shape[0] - i][di] = np.where(np.equal(diagonal, np.min(diagonal)), 1, 0)
+		for i in np.arange(a.shape[1] - a.shape[0] + 1, dtype=np.intp):
+			diagonal = np.diagonal(a[:, i:a.shape[0] + i])
+			di = np.diag_indices(a[:, i:a.shape[0] + i].shape[0])
+			lmx[:, i:a.shape[0] + i][di] = local_max(diagonal)[0]
+			lmn[:, i:a.shape[0] + i][di] = local_min(diagonal)[0]
+			lmx2[:, i:a.shape[0] + i][di] = np.where(np.equal(diagonal, np.max(diagonal)), 1, 0)
+			lmn2[:, i:a.shape[0] + i][di] = np.where(np.equal(diagonal, np.min(diagonal)), 1, 0)
+		for i in np.arange(a.shape[0] - 1, 2, -1, dtype=np.intp):
+			diagonal = np.diagonal(a[:i, a.shape[1] - i:])
+			di = np.diag_indices(a[:i, a.shape[1] - i:].shape[0])
+			lmx[:i, a.shape[1] - i:][di] = local_max(diagonal)[0]
+			lmn[:i, a.shape[1] - i:][di] = local_min(diagonal)[0]
+			lmx2[:i, a.shape[1] - i:][di] = np.where(np.equal(diagonal, np.max(diagonal)), 1, 0)
+			lmn2[:i, a.shape[1] - i:][di] = np.where(np.equal(diagonal, np.min(diagonal)), 1, 0)
+	elif a.shape[0] > a.shape[1]:
+		for i in np.arange(a.shape[1] - 3, 0, -1, dtype=np.intp):
+			diagonal = np.diagonal(a[:a.shape[1] - i, i:])
+			di = np.diag_indices(a[:a.shape[1] - i, i:].shape[0])
+			lmx[:a.shape[1] - i, i:][di] = local_max(diagonal)[0]
+			lmn[:a.shape[1] - i, i:][di] = local_min(diagonal)[0]
+			lmx2[:a.shape[1] - i, i:][di] = np.where(np.equal(diagonal, np.max(diagonal)), 1, 0)
+			lmn2[:a.shape[1] - i, i:][di] = np.where(np.equal(diagonal, np.min(diagonal)), 1, 0)
+		for i in np.arange(a.shape[0] - a.shape[1] + 1, dtype=np.intp):
+			diagonal = np.diagonal(a[i:a.shape[1] + i, :])
+			di = np.diag_indices(a[i:a.shape[1] + i, :].shape[0])
+			lmx[i:a.shape[1] + i, :][di] = local_max(diagonal)[0]
+			lmn[i:a.shape[1] + i, :][di] = local_min(diagonal)[0]
+			lmx2[i:a.shape[1] + i, :][di] = np.where(np.equal(diagonal, np.max(diagonal)), 1, 0)
+			lmn2[i:a.shape[1] + i, :][di] = np.where(np.equal(diagonal, np.min(diagonal)), 1, 0)
+		for i in np.arange(a.shape[1] - 1, 2, -1, dtype=np.intp):
+			diagonal = np.diagonal(a[a.shape[0] - i:, :i])
+			di = np.diag_indices(a[a.shape[0] - i:, :i].shape[0])
+			lmx[a.shape[0] - i:, :i][di] = local_max(diagonal)[0]
+			lmn[a.shape[0] - i:, :i][di] = local_min(diagonal)[0]
+			lmx2[a.shape[0] - i:, :i][di] = np.where(np.equal(diagonal, np.max(diagonal)), 1, 0)
+			lmn2[a.shape[0] - i:, :i][di] = np.where(np.equal(diagonal, np.min(diagonal)), 1, 0)
+	if flipped:
+		lmx = np.fliplr(lmx)
+		lmn = np.fliplr(lmn)
+		lmx2 = np.fliplr(lmx2)
+		lmn2 = np.fliplr(lmn2)
+	return lmx, lmn, lmx2, lmn2
 
-
-#OCR('SRO', 'Q:/autopaper/Untitled4.png', tolerance_threshold=12)
-#OCR('Unit', get_gradient('Q:/autopaper/Untitled.jpg'), tolerance_threshold=24)
-"""time = None
-for i in range(10):
-	now=datetime.datetime.today()
-	im = Image.open('Q:/autopaper/Untitled2.png').convert('RGB')
-	im2 = Image.open('Q:/autopaper/Untitled2.png').convert('L')
-	img, img2 = get_gradient(im), get_gradient(im2)
-	img3 = np.subtract(img, img2)
-	if (img3.min() < 0) and ((img3.max() + np.absolute(img3.min())) <= 255):
-		img3 = np.rint(img3 + np.absolute(img3.min()))
-	#[620:665,340:620]
-	if time is None:
-		time = datetime.datetime.today()-now
-	else:
-		time += datetime.datetime.today()-now
-	print(datetime.datetime.today()-now)
-print()
-print(time/10)"""
+"""
 im = Image.open('Q:/autopaper/Untitled2.png').convert('RGB')
-#img, img2 = get_gradient(im), get_gradient(im.convert('L'))
-#img3 = np.subtract(img, img2)
-#if (img3.min() < 0) and ((img3.max() + np.absolute(img3.min())) <= 255):
-#	img3 = np.asarray(np.rint(img3 + np.absolute(img3.min())), dtype=np.int8)
-#print(len(set(img.flatten().tolist())), len(set(img2.flatten().tolist())))
-
-im2 = np.array(Image.open('Untitled2.png').convert('L'), dtype=np.int16)
 im2 = get_gradient(im)
 
+d = np.floor_divide(np.hypot(im2.shape[0],im2.shape[1]), 2)
+print(np.hypot(im2.shape[0], im2.shape[1]))
+for i in np.arange(-im2.shape[0]+1, im2.shape[1], dtype=np.intp):
+	for j in np.ndenumerate(np.diagonal(im2, i)):
+		print(i,j)
+quit()"""
 
 #print(im2.shape)
 #OCR("General", im2, 31)
@@ -297,7 +345,7 @@ def temp_thread(chunk, xy, h, w, min_dim, lmxh, lmnh, lmxv, lmnv, lmxd, lmnd, th
 
 				if (lmxv2[0].shape[0] == lmxv.shape[0] and lmnv2[0].shape[0] == lmnv.shape[0]) and (
 					np.less_equal(np.abs(np.sum(np.subtract(lmxv2[0], lmxv))), lmxv.shape[0]) and np.less_equal(np.abs(np.sum(np.subtract(lmnv2[0], lmnv))), lmnv.shape[0])):
-					array = chunk[y - min_dim:y - min_dim + char_array.shape[0], x - min_dim:x - min_dim + char_array.shape[1]][di]
+					array = chunk[y - min_dim:y - min_dim + char_array.shape[0], x - min_dim:x - min_dim + char_array.shape[1]]
 					lmxd2 = np.array(local_max(array,legacy=True))
 					lmnd2 = np.array(local_min(array,legacy=True))
 
@@ -444,7 +492,6 @@ for row,row2 in zip(im,im2):
 	print(row2.mean())
 	print()
 print(np.mean(im), np.mean(im2))"""
-#a = dev("General", im2, 15)
 def dev2(input_string: str, haystack_image: np.ndarray, threshold: int, max_distance=5):
 	retval = {}
 	master_vals = {}
@@ -550,31 +597,3 @@ def dev2(input_string: str, haystack_image: np.ndarray, threshold: int, max_dist
 					pass
 
 	return master_vals
-retval = dev2("Gen", im2, 30)
-for k,v in retval.items():
-	print(k,v)
-quit()
-im2 = np.stack((im2, im2, im2), axis=2)
-for k,v in retval.items():
-	char_array = CHARACTER_ARRAYS[k]
-	h = np.floor_divide(char_array.shape[0], 2)
-	w = np.floor_divide(char_array.shape[1], 2)
-	for x,y in v:
-		im2[y-h-1:y-h+char_array.shape[0]+1,x-w-1:x-w] = 255,0,0
-		im2[y-h-1:y-h+char_array.shape[0]+1,x-w+char_array.shape[1]:x-w+char_array.shape[1]+1] = 255,0,0
-		im2[y-h-1:y-h,x-w-1:x-w+char_array.shape[1]+1] = 255,0,0
-		im2[y-h+char_array.shape[0]:y-h+char_array.shape[0]+1,x-w-1:x-w+char_array.shape[1]+1] = 255, 0, 0
-show_image(im2, gray=False)
-quit()
-for x,y in vals:
-	array = im2[y - h:y - h + a.shape[0], x - w:x - w + a.shape[1]]
-	print(np.mean(np.abs(np.subtract(array, a))))
-	plt.imshow(im2[y-h:y-h+a.shape[0], x-w:x-w+a.shape[1]], cmap='gray')
-	plt.show()
-#for b in a:
-#	print(b)
-#a = np.array([[16,64,16],[32,255,32],[16,64,16]])
-#print(a)
-#b = np.where(a > 16, a, 0)
-#for c in b:
-#	print(c)

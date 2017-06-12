@@ -238,9 +238,4 @@ def line_algorithm(width: int, height: int) -> np.ndarray:
 #plt.imshow(b, cmap='gray')
 #plt.show()
 #12 iterations
-a = line_algorithm(11,7)
-
-print(a)
-for x in range(1,20,2):
-	print(x)
-
+#a = line_algorithm(11,7)
