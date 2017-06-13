@@ -22,9 +22,22 @@ c.execute('CREATE TABLE character_shapes (char, shape)')
 conn.commit()
 conn.close()"""
 
+def look_test(char: np.ndarray):
+	char = np.asarray(get_gradient(char), dtype=np.int32)
+	retval = []
+	img2 = np.array(Image.open('Untitled2.png').convert('L'))
+	img = np.asarray(get_gradient(img2), dtype=np.int32)
+	for y in np.arange(img.shape[0]-char.shape[0]):
+		for x in np.arange(img.shape[1]-char.shape[1]):
+			k = np.asarray(img[y:y+char.shape[0], x:x+char.shape[1]].copy(), dtype=np.int32)
+			val = np.mean(np.abs(np.subtract(k.copy(),char.copy())))
+			if val < 20:
+				print(x, y, val)
+				retval.append(img2[y:y+char.shape[0]+1, x:x+char.shape[1]+1])
+	return retval
 
 
-def markup_plot(ax: plt.axis, line_num: int=0, dashed=False, mark_local=True, mark_global=True):
+def markup_plot(ax: plt.axis, line_num: int=0, dashed=False, mark_local=False, mark_global=True):
 	line = ax.lines[line_num]
 	x_data,y_data = line.get_xdata(),line.get_ydata()
 	lmn = local_min(y_data)
@@ -57,9 +70,6 @@ def markup_plot(ax: plt.axis, line_num: int=0, dashed=False, mark_local=True, ma
 			else:
 				ax.text(i, mn-40, str(mn), ha='center', va='center')
 
-
-
-
 def remember(char: str=None) -> dict:
 	if not char:
 		retdict = {}
@@ -79,7 +89,6 @@ def remember(char: str=None) -> dict:
 				#full_array += np.array(sample)
 				pass
 		#return retval
-
 
 def teach(char: str, image: np.ndarray):
 	temp = {}
@@ -127,6 +136,121 @@ def teach(char: str, image: np.ndarray):
 		temp[direction] = (lmx, lmn, lmx2, lmn2)
 	return temp
 #char, image_array, direction, local_max, local_min, local_max2, local_min2, global_max, global_min
+
+def compare_levels(a1: np.ndarray, a2: Tuple[np.ndarray], title: str, one_window=True):
+	columns = len(a2)
+	if one_window:
+		f, ax_t = plt.subplots(4, columns, sharex=True, sharey=True)
+		for i in np.arange(columns):
+			(ax1, ax2, ax3, ax4) = ax_t[:, i]
+			ax1.set_title(title + str(i + 1))
+
+			cx = np.floor_divide(a2[i].shape[1], 2)
+			cy = np.floor_divide(a2[i].shape[0], 2)
+			min_dim = min(a2[i].shape[0], a2[i].shape[1])
+			di = np.diag_indices(min_dim)
+			b1 = np.fliplr(a1.copy())
+			b2 = np.fliplr(a2[i].copy())
+
+			# Horizontal
+			ax1.plot(np.arange(a1.shape[1]), a1[cy, :], '.r-')
+			temp1 = get_gradient(a1[cy, :])
+			ax1.plot(np.arange(1, a1.shape[1]), temp1, '.r--')
+			ax1.plot(np.arange(a2[i].shape[1]), a2[i][cy, :], '.r:', alpha=0.3)
+			temp2 = get_gradient(a2[i][cy, :])
+			ax1.plot(np.arange(1, a2[i].shape[1]), temp2, '.r-.', alpha=0.3)
+			ax1.vlines(np.arange(a1.shape[1]), a1[cy, :], a2[i][cy, :], linestyles='dashed')
+			ax1.vlines(np.arange(1, a1.shape[1]), temp1, temp2, linestyles='dotted')
+
+			# Vertical
+			ax2.plot(np.arange(a1.shape[0]), a1[:, cx], '.g-')
+			temp1 = get_gradient(a1[:, cx])
+			ax2.plot(np.arange(1, a1.shape[0]), temp1, '.g--')
+			ax2.plot(np.arange(a2[i].shape[0]), a2[i][:, cx], '.g:', alpha=0.3)
+			temp2 = get_gradient(a2[i][:, cx])
+			ax2.plot(np.arange(1, a2[i].shape[0]), temp2, '.g-.', alpha=0.3)
+			ax2.vlines(np.arange(a1.shape[0]), a1[:, cx], a2[i][:, cx], linestyles='dashed')
+			ax2.vlines(np.arange(1, a1.shape[0]), temp1, temp2, linestyles='dotted')
+
+			# Negative Diagonal
+			ax3.plot(np.arange(min_dim), a1[di], '.b-')
+			temp1 = get_gradient(a1[di])
+			ax3.plot(np.arange(1, min_dim), temp1, '.b--')
+			ax3.plot(np.arange(min_dim), a2[i][di], '.b:', alpha=0.3)
+			temp2 = get_gradient(a2[i][di])
+			ax3.plot(np.arange(1, min_dim), temp2, '.b-.', alpha=0.3)
+			ax3.vlines(np.arange(min_dim), a1[di], a2[i][di], linestyles='dashed')
+			ax3.vlines(np.arange(1, min_dim), temp1, temp2, linestyles='dotted')
+
+			# Positive Diagonal
+			ax4.plot(np.arange(min_dim), b1[di], '.c-')
+			temp1 = get_gradient(b1[di])
+			ax4.plot(np.arange(1, min_dim), temp1, '.c--')
+			ax4.plot(np.arange(min_dim), b2[di], '.c:', alpha=0.3)
+			temp2 = get_gradient(b2[di])
+			ax4.plot(np.arange(1, min_dim), temp2, '.c-.', alpha=0.3)
+			ax4.vlines(np.arange(min_dim), b1[di], b2[di], linestyles='dashed')
+			ax4.vlines(np.arange(1, min_dim), temp1, temp2, linestyles='dotted')
+
+		f.subplots_adjust(hspace=0)
+		# plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
+		plt.show()
+	else:
+		for c in np.arange(4):
+			f, ax_t = plt.subplots(columns, sharex=True, sharey=True)
+			for i,ax in enumerate(ax_t):
+				#ax.set_title(title + str(i + 1))
+				cx = np.floor_divide(a2[i].shape[1], 2)
+				cy = np.floor_divide(a2[i].shape[0], 2)
+				min_dim = min(a2[i].shape[0], a2[i].shape[1])
+				di = np.diag_indices(min_dim)
+				b1 = np.fliplr(a1.copy())
+				b2 = np.fliplr(a2[i].copy())
+
+				if c == 0:
+					ax.plot(np.arange(a1.shape[1]), a1[cy, :], '.r-')
+					temp1 = get_gradient(a1[cy, :])
+					ax.plot(np.arange(1, a1.shape[1]), temp1, '.r--')
+					ax.plot(np.arange(a2[i].shape[1]), a2[i][cy, :], '.b:')
+					temp2 = get_gradient(a2[i][cy, :])
+					ax.plot(np.arange(1, a2[i].shape[1]), temp2, '.b-.')
+					ax.vlines(np.arange(a1.shape[1]), a1[cy, :], a2[i][cy, :], linestyles='dashed')
+					ax.vlines(np.arange(1, a1.shape[1]), temp1, temp2, linestyles='dotted')
+
+				elif c == 1:
+					ax.plot(np.arange(a1.shape[0]), a1[:, cx], '.g-')
+					temp1 = get_gradient(a1[:, cx])
+					ax.plot(np.arange(1, a1.shape[0]), temp1, '.g--')
+					ax.plot(np.arange(a2[i].shape[0]), a2[i][:, cx], '.r:')
+					temp2 = get_gradient(a2[i][:, cx])
+					ax.plot(np.arange(1, a2[i].shape[0]), temp2, '.r-.')
+					ax.vlines(np.arange(a1.shape[0]), a1[:, cx], a2[i][:, cx], linestyles='dashed')
+					ax.vlines(np.arange(1, a1.shape[0]), temp1, temp2, linestyles='dotted')
+
+				elif c == 2:
+					ax.plot(np.arange(min_dim), a1[di], '.b-')
+					temp1 = get_gradient(a1[di])
+					ax.plot(np.arange(1, min_dim), temp1, '.b--')
+					ax.plot(np.arange(min_dim), a2[i][di], '.g:')
+					temp2 = get_gradient(a2[i][di])
+					ax.plot(np.arange(1, min_dim), temp2, '.g-.')
+					ax.vlines(np.arange(min_dim), a1[di], a2[i][di], linestyles='dashed')
+					ax.vlines(np.arange(1, min_dim), temp1, temp2, linestyles='dotted')
+
+				elif c == 3:
+					ax.plot(np.arange(min_dim), b1[di], '.c-')
+					temp1 = get_gradient(b1[di])
+					ax.plot(np.arange(1, min_dim), temp1, '.c--')
+					ax.plot(np.arange(min_dim), b2[di], '.m:')
+					temp2 = get_gradient(b2[di])
+					ax.plot(np.arange(1, min_dim), temp2, '.m-.')
+					ax.vlines(np.arange(min_dim), b1[di], b2[di], linestyles='dashed')
+					ax.vlines(np.arange(1, min_dim), temp1, temp2, linestyles='dotted')
+
+			f.subplots_adjust(hspace=0)
+			# plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
+			plt.show()
+
 def display_levels(a: Union[np.ndarray, Tuple[np.ndarray]], title: str):
 	"""disp_val = np.empty((list(a_dict.values())[0][0].shape[0], list(a_dict.values())[0][0].shape[1], 3), dtype=np.int16)
 	disp_val[...,0] = ao
@@ -239,9 +363,7 @@ def display_levels(a: Union[np.ndarray, Tuple[np.ndarray]], title: str):
 	else:
 		columns = 1
 	columns = len(a)
-	print(columns)
 	f, ax_t = plt.subplots(4, columns, sharex=True, sharey=True)
-	print(ax_t)
 	for i in np.arange(columns):
 		(ax1, ax2, ax3, ax4) = ax_t[:,i]
 		ax1.set_title(title+str(i+1))
@@ -252,29 +374,25 @@ def display_levels(a: Union[np.ndarray, Tuple[np.ndarray]], title: str):
 		di = np.diag_indices(min_dim)
 		b = np.fliplr(a[i].copy())
 
-		ax1.plot(np.arange(a[i].shape[1]), a[i][cy,:], 'r-')
+		ax1.plot(np.arange(a[i].shape[1]), a[i][cy,:], '.r-')
 		markup_plot(ax1)
-		temp = np.asarray(a[i][cy, :], dtype=np.int32)
-		temp = np.abs(np.subtract(temp[:-1], temp[1:]))
-		ax1.plot(np.arange(1, a[i].shape[1]), temp, 'r--')
+		temp = get_gradient(a[i][cy, :])
+		ax1.plot(np.arange(1, a[i].shape[1]), temp, '.r--')
 
-		ax2.plot(np.arange(a[i].shape[0]), a[i][:,cx], 'g-')
+		ax2.plot(np.arange(a[i].shape[0]), a[i][:,cx], '.g-')
 		markup_plot(ax2)
-		temp = np.asarray(a[i][:,cx], dtype=np.int32)
-		temp = np.abs(np.subtract(temp[:-1], temp[1:]))
-		ax2.plot(np.arange(1, a[i].shape[0]), temp, 'g--')
+		temp = get_gradient(a[i][:,cx])
+		ax2.plot(np.arange(1, a[i].shape[0]), temp, '.g--')
 
-		ax3.plot(np.arange(min_dim), a[i][di], 'b-')
+		ax3.plot(np.arange(min_dim), a[i][di], '.b-')
 		markup_plot(ax3)
-		temp = np.asarray(a[i][di], dtype=np.int32)
-		temp = np.abs(np.subtract(temp[:-1], temp[1:]))
-		ax3.plot(np.arange(1, min_dim), temp, 'b--')
+		temp = get_gradient(a[i][di])
+		ax3.plot(np.arange(1, min_dim), temp, '.b--')
 
-		ax4.plot(np.arange(min_dim), b[di], 'c-')
+		ax4.plot(np.arange(min_dim), b[di], '.c-')
 		markup_plot(ax4)
-		temp = np.asarray(b[di], dtype=np.int32)
-		temp = np.abs(np.subtract(temp[:-1], temp[1:]))
-		ax4.plot(np.arange(1, min_dim), temp, 'c--')
+		temp = get_gradient(b[di])
+		ax4.plot(np.arange(1, min_dim), temp, '.c--')
 
 	f.subplots_adjust(hspace=0)
 	#plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
@@ -290,11 +408,9 @@ G2 = teach('G', G2im)
 G3 = teach('G', G3im)
 G4 = teach('G', G4im)
 G5 = teach('G', G5im)
-display_levels((G1im,G2im,G3im,G4im,G5im), 'G')
-display_levels(G2im, 'G')
-display_levels(G3im, 'G')
-display_levels(G4im, 'G')
-display_levels(G5im, 'G')
+imgs = look_test(G1im)
+#display_levels((G1im,G2im,G3im,G4im,G5im), 'G')
+compare_levels(G1im, imgs, 'G')
 #TODO: Label all points?
 
 
